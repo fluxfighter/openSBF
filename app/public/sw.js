@@ -1,4 +1,4 @@
-const CACHE_NAME = 'opensbf-v1';
+const CACHE_NAME = 'opensbf-v2';
 
 // Next.js static assets use content hashes — safe to cache forever.
 // HTML documents use network-first so users always get the latest markup.
@@ -30,6 +30,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
+
+  // Never cache the progress API — it must always hit the server so the
+  // cross-device sync (and pull-on-start) reflects the latest state.
+  if (url.pathname.startsWith('/api/')) return;
 
   if (isStaticAsset(url)) {
     // Cache-first: content-hashed assets are immutable.

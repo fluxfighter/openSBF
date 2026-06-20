@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
 import { getQueueCounts } from '@/lib/srs';
+import { getStreak, getXp, getTodayCount, DAILY_GOAL } from '@/lib/gamification';
 import { getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { CertificateCard } from '@/components/ui/CertificateCard';
 
@@ -27,6 +28,9 @@ interface ExamHomeStats {
   seePct: number;
   binnenDue: number;
   seeDue: number;
+  streak: number;
+  xp: number;
+  today: number;
 }
 
 function useExamProgress(): ExamHomeStats {
@@ -39,14 +43,18 @@ function useExamProgress(): ExamHomeStats {
       seePct: getExamOverallProgress(progress, see.map((q) => q.id), 'see').percentage,
       binnenDue: getQueueCounts(progress, 'binnen', binnen).total,
       seeDue: getQueueCounts(progress, 'see', see).total,
+      streak: getStreak(progress),
+      xp: getXp(progress),
+      today: getTodayCount(progress),
     };
   });
   return stats;
 }
 
 export default function HomePage(): React.ReactElement {
-  const { binnenPct, seePct, binnenDue, seeDue } = useExamProgress();
+  const { binnenPct, seePct, binnenDue, seeDue, streak, xp, today } = useExamProgress();
   const hasStarted = binnenPct > 0 || seePct > 0;
+  const goalReached = today >= DAILY_GOAL;
 
   const examCards = [
     {
@@ -87,6 +95,49 @@ export default function HomePage(): React.ReactElement {
               ? 'Mach weiter, wo du aufgehört hast.'
               : 'Deine Lernplattform für den Sportbootführerschein Binnen & See.'}
           </p>
+
+          {/* Gamification strip — streak, today's goal, XP */}
+          <div className="mt-6 grid grid-cols-3 gap-3">
+            <div
+              className="rounded-xl px-3 py-3 text-center"
+              style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
+            >
+              <div className="text-xl font-bold tabular-nums" style={{ color: streak > 0 ? 'var(--gold)' : 'var(--muted)' }}>
+                🔥 {streak}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                Tage Streak
+              </div>
+            </div>
+            <div
+              className="rounded-xl px-3 py-3 text-center"
+              style={{
+                background: goalReached ? 'rgba(18, 184, 112, 0.10)' : 'var(--navy)',
+                border: `1px solid ${goalReached ? 'rgba(18, 184, 112, 0.30)' : 'var(--border)'}`,
+              }}
+            >
+              <div
+                className="text-xl font-bold tabular-nums"
+                style={{ color: goalReached ? 'var(--green-signal)' : 'var(--white)' }}
+              >
+                {goalReached ? '✓' : `${today}/${DAILY_GOAL}`}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                Heute
+              </div>
+            </div>
+            <div
+              className="rounded-xl px-3 py-3 text-center"
+              style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
+            >
+              <div className="text-xl font-bold tabular-nums" style={{ color: 'var(--seafoam-light)' }}>
+                {xp}
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                XP
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

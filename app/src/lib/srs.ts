@@ -83,10 +83,6 @@ function isNew(p: QuestionProgress | undefined): boolean {
   return !p;
 }
 
-function isStable(p: QuestionProgress | undefined): boolean {
-  return (p?.intervalDays ?? 0) >= STABLE_INTERVAL_DAYS;
-}
-
 export interface QueueCounts {
   due: number;
   fresh: number; // available never-seen cards (capped at newPerDay)
@@ -139,18 +135,63 @@ export function buildDailyQueue(
   return shuffle([...due, ...cappedFresh]);
 }
 
-/** Share of the catalog that is learned (stable) — a proxy for exam readiness. */
+// Predicted exam score >= this counts as exam-ready.
+export const READINESS_TARGET = 85;
+
+// Bayesian prior for novel-question skill: pretend we've seen PRIOR_N questions
+// with a PRIOR_P first-try success rate, so the estimate is sane with little data.
+const PRIOR_N = 6;
+const PRIOR_P = 0.5;
+
+/** Current recall probability of a seen card (FSRS-style retrievability). */
+function retrievability(p: QuestionProgress, now: number): number {
+  const stability = Math.max(p.intervalDays ?? 1, 1);
+  const elapsedDays = Math.max(0, (now - new Date(p.lastAnswered).getTime()) / DAY_MS);
+  return Math.pow(0.9, elapsedDays / stability); // 1 right after review, 0.9 at due date
+}
+
+/**
+ * Smart exam readiness: the predicted share of the *whole* catalog you'd answer
+ * correctly right now. Seen cards use their current recall probability; unseen
+ * cards use your demonstrated first-try accuracy (Bayes-smoothed). This rewards
+ * both breadth (seeing more) and retention (reviewing on time), and gives an
+ * honest estimate for questions you've never encountered.
+ */
 export function getReadiness(
   progress: UserProgress,
   exam: ExamType,
   allQuestions: Question[],
-): { stable: number; total: number; percentage: number } {
+  now: number = Date.now(),
+): { percentage: number; predictedCorrect: number; total: number; seen: number; ready: boolean } {
   const total = allQuestions.length;
-  let stable = 0;
+
+  // Demonstrated skill on fresh questions: fraction of seen cards answered
+  // right without ever failing, smoothed with a weak prior.
+  let seen = 0;
+  let cleanFirstTry = 0;
   for (const q of allQuestions) {
-    if (isStable(entry(progress, q.id, exam))) stable++;
+    const p = entry(progress, q.id, exam);
+    if (!p) continue;
+    seen++;
+    if ((p.correctCount ?? 0) > 0 && (p.wrongCount ?? 0) === 0) cleanFirstTry++;
   }
-  return { stable, total, percentage: total > 0 ? Math.round((stable / total) * 100) : 0 };
+  const baseAccuracy = (cleanFirstTry + PRIOR_N * PRIOR_P) / (seen + PRIOR_N);
+
+  let expected = 0;
+  for (const q of allQuestions) {
+    const p = entry(progress, q.id, exam);
+    if (!p) {
+      expected += baseAccuracy; // never seen → fall back to demonstrated skill
+    } else if ((p.reps ?? 0) >= 1) {
+      expected += Math.min(0.99, Math.max(0.3, retrievability(p, now)));
+    } else {
+      expected += baseAccuracy * 0.5; // currently lapsed/relearning
+    }
+  }
+
+  const predictedCorrect = Math.round(expected);
+  const percentage = total > 0 ? Math.round((expected / total) * 100) : 0;
+  return { percentage, predictedCorrect, total, seen, ready: percentage >= READINESS_TARGET };
 }
 
 function shuffle<T>(arr: T[]): T[] {

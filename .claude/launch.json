@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "opensbf",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "cd app && OPENSBF_DATA_DIR=.devdata npm run dev"],
+      "port": 3000
+    }
+  ]
+}

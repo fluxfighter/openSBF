@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -319,8 +320,12 @@ export default function QuizPage(): React.ReactElement {
           />
         </div>
 
-        <div
-          className="rounded-xl p-6 mb-3"
+        <motion.div
+          key={currentQuestion.id}
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          className="rounded-2xl p-5 sm:p-6 mb-3"
           style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
         >
           <div className="flex items-center justify-between mb-5">
@@ -369,15 +374,15 @@ export default function QuizPage(): React.ReactElement {
             </div>
           )}
 
-          <h2 className="text-base font-medium leading-relaxed mb-6" style={{ color: 'var(--white)' }}>
+          <h2 className="text-lg sm:text-xl font-medium leading-relaxed mb-6" style={{ color: 'var(--white)' }}>
             {currentQuestion.text}
           </h2>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {shuffledOptions.map((option, i) => {
               const isSelected = selectedAnswer === option.key;
               const isCorrectOption = option.originalKey === currentQuestion.correctAnswer;
-              let className = 'answer-option flex items-start gap-3 p-3.5 rounded-lg border w-full text-left';
+              let className = 'answer-option flex items-start gap-3 p-4 min-h-[3.5rem] rounded-xl border w-full text-left';
               let optionStyle: React.CSSProperties = {
                 borderColor: 'var(--border)',
                 background: 'transparent',
@@ -403,7 +408,7 @@ export default function QuizPage(): React.ReactElement {
                   disabled={isRevealed}
                 >
                   <span
-                    className="shrink-0 w-5 h-5 rounded flex items-center justify-center text-xs font-semibold mt-0.5"
+                    className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-sm font-semibold"
                     style={{
                       background:
                         isRevealed && isCorrectOption
@@ -419,7 +424,7 @@ export default function QuizPage(): React.ReactElement {
                   >
                     {['A', 'B', 'C', 'D'][i]}
                   </span>
-                  <span className="text-sm leading-relaxed" style={{ color: 'var(--white)' }}>
+                  <span className="text-[15px] sm:text-base leading-relaxed self-center" style={{ color: 'var(--white)' }}>
                     {option.text}
                   </span>
                 </button>
@@ -460,38 +465,37 @@ export default function QuizPage(): React.ReactElement {
                 }`,
               }}
             >
-              <div className="flex items-center justify-between gap-3">
-                <span
-                  className="text-sm font-medium"
-                  style={{
-                    color:
-                      selectedAnswer === currentQuestion.correctAnswer
-                        ? 'var(--green-signal)'
-                        : 'var(--red-signal)',
-                  }}
-                >
-                  {selectedAnswer === currentQuestion.correctAnswer
-                    ? 'Richtig'
-                    : `Falsch — Richtig wäre Antwort ${['A', 'B', 'C', 'D'][shuffledOptions.findIndex((o) => o.originalKey === currentQuestion.correctAnswer)]}`}
-                </span>
-                <button
-                  onClick={handleNext}
-                  className="shrink-0 px-4 py-1.5 rounded-md text-xs font-semibold transition-opacity hover:opacity-80"
-                  style={{ background: 'var(--gold)', color: 'var(--navy-deepest)' }}
-                >
-                  Weiter →
-                </button>
-              </div>
+              <span
+                className="text-sm font-semibold"
+                style={{
+                  color:
+                    selectedAnswer === currentQuestion.correctAnswer
+                      ? 'var(--green-signal)'
+                      : 'var(--red-signal)',
+                }}
+              >
+                {selectedAnswer === currentQuestion.correctAnswer
+                  ? 'Richtig'
+                  : `Falsch — Richtig wäre Antwort ${['A', 'B', 'C', 'D'][shuffledOptions.findIndex((o) => o.originalKey === currentQuestion.correctAnswer)]}`}
+              </span>
               {selectedAnswer !== currentQuestion.correctAnswer && currentQuestion.hint && (
-                <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
                   {currentQuestion.hint}
                 </p>
               )}
+              <button
+                onClick={handleNext}
+                autoFocus
+                className="mt-3 w-full py-3.5 rounded-xl text-base font-semibold transition-opacity hover:opacity-90"
+                style={{ background: 'var(--gold)', color: 'var(--navy-deepest)' }}
+              >
+                Weiter →
+              </button>
             </div>
           )}
-        </div>
+        </motion.div>
 
-        <p className="text-center text-xs" style={{ color: 'rgba(106, 136, 168, 0.4)' }}>
+        <p className="hidden sm:block text-center text-xs" style={{ color: 'rgba(106, 136, 168, 0.4)' }}>
           1–4 auswählen · Enter = weiter
         </p>
       </div>
