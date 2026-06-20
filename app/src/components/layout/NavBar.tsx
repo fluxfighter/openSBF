@@ -148,9 +148,9 @@ export function NavBar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          <Link href="/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center group" aria-label="Start">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold shrink-0"
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
               style={{
                 background: 'var(--gold-light)',
                 color: '#030810',
@@ -159,12 +159,6 @@ export function NavBar() {
             >
               ⚓
             </div>
-            <span
-              className="text-base font-bold tracking-tight"
-              style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
-            >
-              Open<span style={{ color: 'var(--gold-light)' }}>SBF</span>
-            </span>
           </Link>
 
           <div className="hidden md:flex items-center gap-0.5">

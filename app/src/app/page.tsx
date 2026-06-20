@@ -53,7 +53,6 @@ function useExamProgress(): ExamHomeStats {
 
 export default function HomePage(): React.ReactElement {
   const { binnenPct, seePct, binnenDue, seeDue, streak, xp, today } = useExamProgress();
-  const hasStarted = binnenPct > 0 || seePct > 0;
   const goalReached = today >= DAILY_GOAL;
 
   const examCards = [
@@ -82,22 +81,10 @@ export default function HomePage(): React.ReactElement {
   return (
     <div className="min-h-screen" style={{ background: 'var(--navy-deep)' }}>
       {/* Header */}
-      <section className="px-4 pt-16 pb-10 border-b" style={{ borderColor: 'var(--border)' }}>
+      <section className="px-4 pt-10 pb-10 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="max-w-3xl mx-auto">
-          <h1
-            className="text-3xl sm:text-4xl font-bold mb-2"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
-          >
-            Open<span style={{ color: 'var(--gold)' }}>SBF</span>
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {hasStarted
-              ? 'Mach weiter, wo du aufgehört hast.'
-              : 'Deine Lernplattform für den Sportbootführerschein Binnen & See.'}
-          </p>
-
           {/* Gamification strip — streak, today's goal, XP */}
-          <div className="mt-6 grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div
               className="rounded-xl px-3 py-3 text-center"
               style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}

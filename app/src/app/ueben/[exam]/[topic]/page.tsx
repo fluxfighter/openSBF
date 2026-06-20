@@ -64,11 +64,15 @@ type QuestionView = {
   isRevealed: boolean;
 };
 
+type AnsweredRecord = { options: ShuffledOption[]; selectedAnswer: AnswerKey };
+
 type QuizState = {
   progress: UserProgress;
   questions: Question[];
   currentIdx: number;
   view: QuestionView;
+  // Revealed answers per deck index, so the user can step back and review them.
+  answered: Record<number, AnsweredRecord>;
 };
 
 function makeView(question: Question): QuestionView {
@@ -76,6 +80,14 @@ function makeView(question: Question): QuestionView {
     question.answers.map((a) => ({ key: a.key, text: a.text, originalKey: a.key })),
   );
   return { options, selectedAnswer: null, isRevealed: false };
+}
+
+// Rebuild the view for a deck index — restoring the revealed answer if it was
+// already answered, otherwise a fresh (unrevealed) view.
+function viewForIndex(state: QuizState, idx: number): QuestionView {
+  const rec = state.answered[idx];
+  if (rec) return { options: rec.options, selectedAnswer: rec.selectedAnswer, isRevealed: true };
+  return makeView(state.questions[idx]);
 }
 
 function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizState {
@@ -97,8 +109,11 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizS
   const view = questions[currentIdx]
     ? makeView(questions[currentIdx])
     : { options: [], selectedAnswer: null, isRevealed: false };
-  return { progress, questions, currentIdx, view };
+  return { progress, questions, currentIdx, view, answered: {} };
 }
+
+// Delay before auto-advancing after a correct answer (ms).
+const AUTO_ADVANCE_MS = 750;
 
 export default function QuizPage(): React.ReactElement {
   const params = useParams();
@@ -118,6 +133,10 @@ export default function QuizPage(): React.ReactElement {
 
   const [sessionStats, setSessionStats] = useState<SessionStats>({ correct: 0, wrong: 0, total: 0 });
   const [isComplete, setIsComplete] = useState(false);
+  // Set when a correct answer should auto-advance after a short delay.
+  const [pendingAdvance, setPendingAdvance] = useState(false);
+
+  const canGoBack = currentIdx > 0 && !pendingAdvance;
 
   useEffect(() => {
     if (questions.length === 0) return;
@@ -137,17 +156,22 @@ export default function QuizPage(): React.ReactElement {
         ...prev,
         progress: updatedProgress,
         view: { ...prev.view, selectedAnswer: key, isRevealed: true },
+        answered: { ...prev.answered, [prev.currentIdx]: { options: prev.view.options, selectedAnswer: key } },
       }));
       setSessionStats((prev) => ({
         correct: prev.correct + (isCorrect ? 1 : 0),
         wrong: prev.wrong + (isCorrect ? 0 : 1),
         total: prev.total + 1,
       }));
+      // Correct → brief feedback, then auto-advance. Wrong → wait for the user
+      // to read the explanation and tap "Weiter".
+      if (isCorrect) setPendingAdvance(true);
     },
     [isRevealed, questions, currentIdx, progress, exam],
   );
 
   const handleNext = useCallback((): void => {
+    setPendingAdvance(false);
     if (currentIdx + 1 >= questions.length) {
       if (topicId === DAILY_QUEUE_TOPIC_ID) {
         // Re-queue cards still due (e.g. just answered "again") without pulling
@@ -157,7 +181,7 @@ export default function QuizPage(): React.ReactElement {
           setIsComplete(true);
           return;
         }
-        setQuiz((prev) => ({ ...prev, questions: stillDue, currentIdx: 0, view: makeView(stillDue[0]) }));
+        setQuiz((prev) => ({ ...prev, questions: stillDue, currentIdx: 0, view: makeView(stillDue[0]), answered: {} }));
         return;
       }
       if (topicId === HARD_QUESTIONS_TOPIC_ID) {
@@ -175,18 +199,38 @@ export default function QuizPage(): React.ReactElement {
         return;
       }
       const newQuestions = shuffleArray(unpassed);
-      setQuiz((prev) => ({ ...prev, questions: newQuestions, currentIdx: 0, view: makeView(newQuestions[0]) }));
+      setQuiz((prev) => ({ ...prev, questions: newQuestions, currentIdx: 0, view: makeView(newQuestions[0]), answered: {} }));
       return;
     }
     setQuiz((prev) => ({
       ...prev,
       currentIdx: prev.currentIdx + 1,
-      view: makeView(prev.questions[prev.currentIdx + 1]),
+      view: viewForIndex(prev, prev.currentIdx + 1),
     }));
   }, [currentIdx, questions, topicId, exam, progress, allQuestions]);
 
+  const handleBack = useCallback((): void => {
+    setPendingAdvance(false);
+    setQuiz((prev) => {
+      if (prev.currentIdx === 0) return prev;
+      const idx = prev.currentIdx - 1;
+      return { ...prev, currentIdx: idx, view: viewForIndex(prev, idx) };
+    });
+  }, []);
+
+  // Auto-advance shortly after a correct answer.
+  useEffect(() => {
+    if (!pendingAdvance) return;
+    const t = setTimeout(() => handleNext(), AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [pendingAdvance, handleNext]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'ArrowLeft' && currentIdx > 0) {
+        handleBack();
+        return;
+      }
       if (e.key === 'Enter' && isRevealed) {
         handleNext();
         return;
@@ -199,7 +243,7 @@ export default function QuizPage(): React.ReactElement {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isRevealed, handleNext, handleSelect]);
+  }, [isRevealed, handleNext, handleSelect, handleBack, currentIdx]);
 
   if (questions.length === 0) {
     const queueEmpty = isQueueMode(topicId);
@@ -330,6 +374,16 @@ export default function QuizPage(): React.ReactElement {
         >
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
+              {canGoBack && (
+                <button
+                  onClick={handleBack}
+                  aria-label="Vorherige Frage"
+                  className="flex items-center justify-center w-7 h-7 rounded-lg transition-opacity hover:opacity-80"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}
+                >
+                  ←
+                </button>
+              )}
               <Badge variant="muted" size="sm">#{currentQuestion.id}</Badge>
               {wrongCount > 0 && (
                 <Badge variant="red" size="sm">{wrongCount}× falsch</Badge>
@@ -483,20 +537,22 @@ export default function QuizPage(): React.ReactElement {
                   {currentQuestion.hint}
                 </p>
               )}
-              <button
-                onClick={handleNext}
-                autoFocus
-                className="mt-3 w-full py-3.5 rounded-xl text-base font-semibold transition-opacity hover:opacity-90"
-                style={{ background: 'var(--gold)', color: 'var(--navy-deepest)' }}
-              >
-                Weiter →
-              </button>
+              {!pendingAdvance && (
+                <button
+                  onClick={handleNext}
+                  autoFocus
+                  className="mt-3 w-full py-3.5 rounded-xl text-base font-semibold transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--gold)', color: 'var(--navy-deepest)' }}
+                >
+                  Weiter →
+                </button>
+              )}
             </div>
           )}
         </motion.div>
 
         <p className="hidden sm:block text-center text-xs" style={{ color: 'rgba(106, 136, 168, 0.4)' }}>
-          1–4 auswählen · Enter = weiter
+          1–4 auswählen · ← zurück · Enter = weiter
         </p>
       </div>
     </div>
