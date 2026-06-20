@@ -33,7 +33,7 @@ function PbCard({ nummer, best, last }: PbCardProps): React.ReactElement {
           <span className="text-xs" style={{ color: 'var(--muted)' }}>Bogen</span>
           <div
             className="text-2xl font-bold tabular-nums"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--seafoam-light)' }}
+            style={{ color: 'var(--seafoam-light)' }}
           >
             {numStr}
           </div>
@@ -124,7 +124,7 @@ export default function PruefungsboegePage(): React.ReactElement {
         <div className="mb-6">
           <h1
             className="text-3xl font-bold mb-2"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             Prüfungsbögen
           </h1>

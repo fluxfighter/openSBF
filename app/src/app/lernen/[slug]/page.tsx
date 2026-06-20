@@ -50,7 +50,7 @@ export default async function TutorialPage({ params }: Props) {
 
           <h1
             className="text-2xl sm:text-3xl font-bold leading-tight"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             {tutorial.title}
           </h1>
@@ -205,7 +205,7 @@ function TutorialContent({ content }: { content: string }) {
           <h2
             key={i}
             className="text-lg font-bold mt-7 mb-3"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             {line.slice(3)}
           </h2>,

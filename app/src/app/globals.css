@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -54,6 +54,31 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Headings: tighter tracking gives Inter a crisp, deliberate feel. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+}
+
+/* No grey tap-flash on touch; let our own active states show through. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keyboard focus stays visible & on-brand, mouse/touch stays clean. */
+:focus-visible {
+  outline: 2px solid var(--gold-light);
+  outline-offset: 2px;
+}
+
+/* Subtle press feedback for tappable controls. */
+button:active:not(:disabled),
+a:active {
+  transform: scale(0.985);
+}
+button, a {
+  transition: transform 90ms ease;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--navy); }
@@ -106,13 +131,18 @@ body {
 
 /* Answer options */
 .answer-option {
-  transition: background 140ms ease, border-color 140ms ease;
+  transition: background 140ms ease, border-color 140ms ease, transform 90ms ease;
   cursor: pointer;
 }
 
 .answer-option:hover:not(.disabled) {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.15);
+}
+
+.answer-option:active:not(.disabled) {
+  transform: scale(0.99);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .answer-option.correct {

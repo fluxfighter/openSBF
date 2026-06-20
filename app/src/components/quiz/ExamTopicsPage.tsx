@@ -90,37 +90,18 @@ export function ExamTopicsPage({
             ← Start
           </Link>
 
-          <div className="flex items-start justify-between gap-6 flex-wrap">
-            <div>
-              <h1
-                className="text-3xl font-bold mb-1"
-                style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
-              >
-                {title}
-              </h1>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>
-                {subtitle}
-              </p>
-            </div>
+          <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--white)' }}>
+            {title}
+          </h1>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            {subtitle}
+          </p>
 
-            <div
-              className="px-4 py-2.5 rounded-lg text-center"
-              style={{ background: accentBg, border: `1px solid ${accentBorder}` }}
-            >
-              <div className="text-xl font-bold tabular-nums" style={{ color: accentVar }}>
-                {passedTopics} / {topics.length}
-              </div>
-              <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                Themen bestanden
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 max-w-sm">
+          <div className="mt-6 max-w-md">
             <ProgressBar
               value={overall.percentage}
               showLabel
-              label={`${overall.passed} von ${overall.total} Fragen`}
+              label={`${overall.passed}/${overall.total} Fragen · ${passedTopics}/${topics.length} Themen`}
               size="md"
               color={accentColor}
               animated={overall.percentage > 0 && overall.percentage < 100}

@@ -610,7 +610,7 @@ function CompletionScreen({
 
         <h2
           className="text-xl font-bold mb-1 text-center"
-          style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+          style={{ color: 'var(--white)' }}
         >
           {title}
         </h2>

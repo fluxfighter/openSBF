@@ -42,7 +42,7 @@ export function CertificateCard({ exam, color }: CertificateCardProps) {
           </div>
           <h3
             className="text-xl sm:text-2xl font-bold leading-tight mb-1"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             Du hast alle {exam}-Fragen gemeistert
           </h3>
@@ -64,7 +64,7 @@ export function CertificateCard({ exam, color }: CertificateCardProps) {
           >
             {exam}
           </div>
-          <div className="text-4xl font-black" style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}>
+          <div className="text-4xl font-extrabold" style={{ color: 'var(--white)' }}>
             100%
           </div>
           <div className="text-xs mt-1" style={{ color: 'var(--muted)' }}>

@@ -652,7 +652,7 @@ export default function NavigationPage() {
           </Link>
           <h1
             className="text-3xl font-bold mb-1"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             Navigation
           </h1>

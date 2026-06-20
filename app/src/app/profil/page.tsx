@@ -245,7 +245,7 @@ export default function ProfilPage(): React.ReactElement {
           </Link>
           <h1
             className="text-3xl font-bold mb-1"
-            style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+            style={{ color: 'var(--white)' }}
           >
             Mein Profil
           </h1>

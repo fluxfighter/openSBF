@@ -97,7 +97,7 @@ function ResultsScreen({ entries, answers, nummer, onRetry }: ResultsProps): Rea
             <div>
               <h1
                 className="text-xl font-bold"
-                style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
+                style={{ color: 'var(--white)' }}
               >
                 {passed ? 'Bestanden' : 'Nicht bestanden'} — Bogen {numStr}
               </h1>

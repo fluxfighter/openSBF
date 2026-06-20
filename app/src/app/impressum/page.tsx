@@ -18,7 +18,7 @@ export default function ImpressumPage() {
 
       <h1
         className="text-3xl font-bold mb-2"
-        style={{ fontFamily: 'Playfair Display, serif', color: 'var(--gold)' }}
+        style={{ color: 'var(--gold)' }}
       >
         Impressum
       </h1>
