@@ -76,6 +76,11 @@ export function ExamTopicsPage({
 
   const passedTopics = Object.values(progressData).filter((p) => p.isPassed).length;
 
+  // Small-bites motivation: how many days to finish at a steady pace.
+  const remaining = Math.max(0, overall.total - overall.passed);
+  const daysAt10 = Math.ceil(remaining / 10);
+  const daysAt20 = Math.ceil(remaining / 20);
+
   const accentVar = accentColor === 'gold' ? 'var(--gold)' : 'var(--seafoam)';
   const accentBg = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.08)' : 'rgba(38, 136, 164, 0.08)';
   const accentBorder = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.18)' : 'rgba(38, 136, 164, 0.18)';
@@ -188,6 +193,13 @@ export function ExamTopicsPage({
               </span>
             </div>
             <ProgressBar value={readiness} size="sm" color={accentColor} />
+            {remaining > 0 && (
+              <p className="text-xs mt-2.5" style={{ color: 'var(--muted)' }}>
+                Noch <span style={{ color: 'var(--white)', fontWeight: 600 }}>{remaining}</span> Fragen ·
+                {' '}10/Tag → <span style={{ color: 'var(--white)' }}>{daysAt10}&nbsp;Tage</span> ·
+                {' '}20/Tag → <span style={{ color: 'var(--white)' }}>{daysAt20}&nbsp;Tage</span>
+              </p>
+            )}
           </div>
         </Link>
 

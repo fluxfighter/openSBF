@@ -20,7 +20,9 @@ import {
   isTopicPassed,
 } from '@/lib/progress';
 import { buildDailyQueue } from '@/lib/srs';
+import { playCorrect, playFinish, isSoundEnabled, setSoundEnabled } from '@/lib/sound';
 import { useMounted } from '@/hooks/useMounted';
+import { SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/react/24/outline';
 import type { UserProgress } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
@@ -114,6 +116,9 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizS
 // Delay before auto-advancing after a correct answer (ms).
 const AUTO_ADVANCE_MS = 750;
 
+// How many cards later a missed question is re-inserted for in-session relearning.
+const RELEARN_GAP = 4;
+
 export default function QuizPage(): React.ReactElement {
   const params = useParams();
   const exam = params.exam as ExamType;
@@ -130,8 +135,16 @@ export default function QuizPage(): React.ReactElement {
   const [isComplete, setIsComplete] = useState(false);
   // Set when a correct answer should auto-advance after a short delay.
   const [pendingAdvance, setPendingAdvance] = useState(false);
+  const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
 
   const canGoBack = currentIdx > 0 && !pendingAdvance;
+
+  const toggleSound = useCallback((): void => {
+    setSoundOn((on) => {
+      setSoundEnabled(!on);
+      return !on;
+    });
+  }, []);
 
   const handleSelect = useCallback(
     (key: AnswerKey): void => {
@@ -142,20 +155,38 @@ export default function QuizPage(): React.ReactElement {
       const updatedProgress = recordAnswer(progress, currentQuestion.id, exam, isCorrect);
       saveProgress(updatedProgress);
 
-      setQuiz((prev) => ({
-        ...prev,
-        progress: updatedProgress,
-        view: { ...prev.view, selectedAnswer: key, isRevealed: true },
-        answered: { ...prev.answered, [prev.currentIdx]: { options: prev.view.options, selectedAnswer: key } },
-      }));
+      setQuiz((prev) => {
+        const answered = {
+          ...prev.answered,
+          [prev.currentIdx]: { options: prev.view.options, selectedAnswer: key },
+        };
+        let nextQuestions = prev.questions;
+        if (!isCorrect) {
+          // Re-show a missed question a few cards later (spacing within the
+          // session) so it's relearned before the deck ends, not only at the end.
+          nextQuestions = [...prev.questions];
+          const insertIdx = Math.min(prev.currentIdx + RELEARN_GAP, nextQuestions.length);
+          nextQuestions.splice(insertIdx, 0, prev.questions[prev.currentIdx]);
+        }
+        return {
+          ...prev,
+          progress: updatedProgress,
+          questions: nextQuestions,
+          view: { ...prev.view, selectedAnswer: key, isRevealed: true },
+          answered,
+        };
+      });
       setSessionStats((prev) => ({
         correct: prev.correct + (isCorrect ? 1 : 0),
         wrong: prev.wrong + (isCorrect ? 0 : 1),
         total: prev.total + 1,
       }));
-      // Correct → brief feedback, then auto-advance. Wrong → wait for the user
-      // to read the explanation and tap "Weiter".
-      if (isCorrect) setPendingAdvance(true);
+      // Correct → satisfying chime + brief feedback, then auto-advance.
+      // Wrong → wait for the user to read the explanation and tap "Weiter".
+      if (isCorrect) {
+        playCorrect();
+        setPendingAdvance(true);
+      }
     },
     [isRevealed, questions, currentIdx, progress, exam],
   );
@@ -337,6 +368,14 @@ export default function QuizPage(): React.ReactElement {
               style={{ width: `${sessionPct}%`, background: barColor }}
             />
           </div>
+          <button
+            onClick={toggleSound}
+            aria-label={soundOn ? 'Ton aus' : 'Ton an'}
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: 'var(--muted)' }}
+          >
+            {soundOn ? <SpeakerWaveIcon className="h-4 w-4" /> : <SpeakerXMarkIcon className="h-4 w-4" />}
+          </button>
           {sessionStats.total > 0 && (
             <div className="flex items-center gap-2 text-xs shrink-0 tabular-nums">
               <span style={{ color: 'var(--green-signal)' }}>{sessionStats.correct}&nbsp;✓</span>
@@ -564,6 +603,15 @@ function CompletionScreen({
       ? 'Du hast alle Problemfragen geübt'
       : topicName;
 
+  // Reward scaled by accuracy: 0–3 stars + a fanfare on arrival.
+  const stars = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : accuracy >= 50 ? 1 : 0;
+  const praise =
+    stars === 3 ? 'Hervorragend!' : stars === 2 ? 'Stark!' : stars === 1 ? 'Solide!' : 'Dranbleiben!';
+
+  useEffect(() => {
+    playFinish(stars);
+  }, [stars]);
+
   const stats: Array<{ label: string; value: number | string; color: string }> = [
     { label: 'Richtig',     value: sessionStats.correct, color: 'var(--green-signal)' },
     { label: 'Falsch',      value: sessionStats.wrong,   color: 'var(--red-signal)' },
@@ -595,9 +643,31 @@ function CompletionScreen({
         >
           {title}
         </h2>
-        <p className="text-sm mb-7 text-center" style={{ color: 'var(--muted)' }}>
+        <p className="text-sm mb-4 text-center" style={{ color: 'var(--muted)' }}>
           {subtitle}
         </p>
+
+        {sessionStats.total > 0 && (
+          <div className="mb-6 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-1.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="text-2xl leading-none transition-transform"
+                  style={{
+                    color: i < stars ? 'var(--gold-light)' : 'rgba(255,255,255,0.14)',
+                    transform: i < stars ? 'scale(1)' : 'scale(0.85)',
+                  }}
+                >
+                  ★
+                </span>
+              ))}
+            </div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--gold-light)' }}>
+              {praise}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-2 mb-7">
           {stats.map((stat) => (
