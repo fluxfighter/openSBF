@@ -1,12 +1,9 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Bars3Icon, XMarkIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-
-const UserMenu = dynamic(() => import('./UserMenu'), { ssr: false });
+import { Bars3Icon, XMarkIcon, ChevronDownIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 
 type NavItem = {
   href: string;
@@ -174,19 +171,17 @@ export function NavBar() {
             {navGroups.map((group) => (
               <DesktopDropdown key={group.label} group={group} pathname={pathname} />
             ))}
-            <Link
-              href="/forum"
-              className="px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors"
-              style={{
-                color: pathname?.startsWith('/forum') ? 'var(--white)' : 'var(--muted)',
-                background: pathname?.startsWith('/forum') ? 'rgba(255,255,255,0.07)' : undefined,
-              }}
-            >
-              Forum
-            </Link>
           </div>
 
           <div className="flex items-center gap-1">
+            <Link
+              href="/profil"
+              className="p-1.5 rounded-md transition-colors hover:bg-white/5"
+              style={{ color: pathname?.startsWith('/profil') ? 'var(--white)' : 'var(--muted)' }}
+              aria-label="Profil"
+            >
+              <UserCircleIcon className="h-6 w-6" />
+            </Link>
             <button
               className="md:hidden p-1.5 rounded-md"
               style={{ color: 'var(--muted)' }}
@@ -195,7 +190,6 @@ export function NavBar() {
             >
               {mobileOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
             </button>
-            <UserMenu />
           </div>
         </div>
       </div>
@@ -203,18 +197,6 @@ export function NavBar() {
       {mobileOpen && (
         <div className="md:hidden border-t" style={{ borderColor: 'var(--border)' }}>
           <div className="px-4 py-2 space-y-0.5">
-            <Link
-              href="/forum"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2.5 px-3.5 py-2 rounded-md text-sm font-semibold transition-colors"
-              style={{
-                color: pathname?.startsWith('/forum') ? 'var(--gold-light)' : 'var(--muted)',
-                background: pathname?.startsWith('/forum') ? 'rgba(255,255,255,0.05)' : undefined,
-              }}
-            >
-              <span className="text-base leading-none">💬</span>
-              Forum
-            </Link>
             {navGroups.map((group) => {
               const isGroupActive = group.activePrefixes.some((p) => pathname.startsWith(p));
               const isExpanded = mobileExpanded === group.label;

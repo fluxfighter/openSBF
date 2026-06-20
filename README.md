@@ -2,6 +2,8 @@
 
 > **[English version below](#english-version)**
 
+> 🛠️ **Fork-Hinweis:** Dies ist ein für **Self-Hosting (Unraid, Docker)** angepasster Fork von [ArzelaAscoIi/openSBF](https://github.com/ArzelaAscoIi/openSBF). Supabase/Auth/Forum und das Login-Gating wurden entfernt; der Lernfortschritt wird über ein schlankes lokales JSON-Backend (`/api/state`) zwischen Geräten (Handy + Rechner) synchronisiert. Geplant: SRS-Wiedervorlage, Gamification und eine mobile Karten-UI.
+
 ---
 
 ## Deutsch
@@ -33,9 +35,8 @@ Die Inhalte basieren auf den offiziellen Fragen- und Antwortkatalogen des Bundes
 
 ### ⚠️ Einschränkungen
 
-- **Kein Backend, kein Nutzerkonto:** Der Lernfortschritt wird ausschließlich im **lokalen Speicher (localStorage) des Browsers** gespeichert. Beim Löschen des Browser-Caches oder beim Wechsel des Geräts gehen alle Daten verloren.
-- **Keine Cloud-Synchronisation** zwischen Geräten.
-- Für die Nutzung auf mehreren Geräten wird der Fortschritt nicht übertragen.
+- **Single-User, ohne Login:** Dieser Fork ist für den privaten Eigenbetrieb gedacht. Es gibt keine Benutzerkonten und keine Mehrnutzer-Trennung – wer den Server im Netzwerk erreicht, teilt sich denselben Lernstand.
+- **Fortschritt:** wird lokal im Browser (localStorage) **und** serverseitig als JSON-Datei gespeichert und beim Start zwischen Geräten zusammengeführt. Bei Nutzung auf einem zweiten Gerät kann ein einmaliges Neuladen nötig sein, um den neuesten Stand zu sehen.
 
 ### 📋 Weitere Prüfungsvoraussetzungen
 
@@ -59,6 +60,21 @@ npm run dev
 ```
 
 Die App läuft dann unter [http://localhost:3000](http://localhost:3000).
+
+### 🐳 Self-Hosting (Docker / Unraid)
+
+Die App baut als eigenständiger Next.js-Standalone-Server und läuft in **einem** Container, ohne externe Datenbank.
+
+```bash
+# im Repo-Root
+docker compose up -d --build
+```
+
+Danach erreichbar unter `http://<unraid-ip>:3000`.
+
+- **Persistenz:** Der Lernfortschritt liegt als `progress.json` im Volume unter `/data` im Container (`OPENSBF_DATA_DIR`). In `docker-compose.yml` ist dafür ein benanntes Volume `opensbf-data` eingerichtet – auf Unraid kannst du es stattdessen auf z. B. `/mnt/user/appdata/opensbf` mappen.
+- **Port:** Standard `3000:3000`; bei Bedarf den Host-Port in `docker-compose.yml` ändern.
+- **PWA:** Die App ist auf dem Handy als Web-App installierbar (Service Worker + Manifest).
 
 ### 🤝 Mitmachen
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 
 type FeedbackType = 'bug' | 'suggestion' | 'other';
 
@@ -47,29 +46,29 @@ export function FeedbackModal({ context, trigger }: FeedbackModalProps) {
     setTimeout(reset, 300);
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!message.trim()) return;
 
     setStatus('loading');
 
-    const supabase = createClient();
-    const page = typeof window !== 'undefined' ? window.location.pathname : null;
-
-    const fullMessage = context
-      ? `[Frage ${context.questionId}] ${message.trim()}`
-      : message.trim();
-
-    const { error } = await supabase.from('feedback').insert({
-      type,
-      message: fullMessage,
-      email: email.trim() || null,
-      page,
-    });
-
-    if (error) {
-      setStatus('error');
-      return;
+    // Single-user self-hosted build: feedback is stored locally as a lightweight
+    // log instead of being sent to a backend service.
+    if (typeof window !== 'undefined') {
+      const page = window.location.pathname;
+      const fullMessage = context
+        ? `[Frage ${context.questionId}] ${message.trim()}`
+        : message.trim();
+      try {
+        const KEY = 'opensbf_feedback_log';
+        const raw = window.localStorage.getItem(KEY);
+        const log: unknown = raw ? JSON.parse(raw) : [];
+        const entries = Array.isArray(log) ? log : [];
+        entries.push({ type, message: fullMessage, email: email.trim() || null, page, at: new Date().toISOString() });
+        window.localStorage.setItem(KEY, JSON.stringify(entries));
+      } catch {
+        // ignore storage errors — feedback is best-effort in the self-hosted build
+      }
     }
 
     setStatus('success');

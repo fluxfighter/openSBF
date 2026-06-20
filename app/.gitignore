@@ -20,6 +20,9 @@
 # production
 /build
 
+# self-hosted progress store (JSON)
+/data
+
 # misc
 .DS_Store
 *.pem

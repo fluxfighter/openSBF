@@ -1,10 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import {
   loadProgress,
   getExamOverallProgress,
@@ -13,6 +10,7 @@ import {
 } from '@/lib/progress';
 import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ProgressSync } from '@/components/ui/ProgressSync';
 import type { UserProgress, ExamType } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
@@ -207,30 +205,14 @@ function ExamSection({ title, icon, href, stats }: ExamSectionProps) {
   );
 }
 
-export default function ProfilPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+export default function ProfilPage(): React.ReactElement {
   const [progress, setProgress] = useState<UserProgress>(loadProgress);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/');
-  }
-
-  function handleResetProgress() {
+  function handleResetProgress(): void {
     resetProgress();
     setProgress(loadProgress());
     setShowResetConfirm(false);
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--navy-deep)' }}>
-        <div className="text-sm" style={{ color: 'var(--muted)' }}>Wird geladen…</div>
-      </div>
-    );
   }
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -274,64 +256,6 @@ export default function ProfilPage() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-        {/* Account section */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
-            Konto
-          </h2>
-          <div
-            className="rounded-xl p-5"
-            style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
-          >
-            {user ? (
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                    style={{ background: 'rgba(188,147,50,0.15)', color: 'var(--gold)' }}
-                  >
-                    {user.email?.[0]?.toUpperCase() ?? '?'}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
-                      {user.email}
-                    </div>
-                    <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                      Fortschritt wird automatisch synchronisiert
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--muted)', border: '1px solid var(--border)' }}
-                >
-                  <span>→</span>
-                  Abmelden
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <div className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
-                    Nicht angemeldet
-                  </div>
-                  <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                    Melde dich an, um deinen Fortschritt geräteübergreifend zu speichern
-                  </div>
-                </div>
-                <Link
-                  href="/auth/login"
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
-                  style={{ background: 'var(--gold)', color: '#030810' }}
-                >
-                  ⚓ Anmelden
-                </Link>
-              </div>
-            )}
-          </div>
-        </section>
-
         {/* Overview stats */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
@@ -470,6 +394,9 @@ export default function ProfilPage() {
           <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
             Daten
           </h2>
+          <div className="mb-3">
+            <ProgressSync />
+          </div>
           <div
             className="rounded-xl p-5"
             style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}

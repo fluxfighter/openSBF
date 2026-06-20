@@ -1,0 +1,20 @@
+services:
+  opensbf:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: opensbf:latest
+    container_name: opensbf
+    restart: unless-stopped
+    ports:
+      # host:container — change the host port if 3000 is taken on Unraid
+      - "3000:3000"
+    environment:
+      - OPENSBF_DATA_DIR=/data
+    volumes:
+      # Persist learning progress. On Unraid point this at e.g.
+      # /mnt/user/appdata/opensbf
+      - opensbf-data:/data
+
+volumes:
+  opensbf-data:

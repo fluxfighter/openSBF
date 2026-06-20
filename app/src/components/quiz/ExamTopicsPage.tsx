@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { TopicCard } from '@/components/quiz/TopicCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { useAuth } from '@/hooks/useAuth';
 import {
   loadProgress,
   getTopicProgress,
@@ -13,8 +12,6 @@ import {
   getHardestQuestions,
 } from '@/lib/progress';
 import type { ExamType, Topic, Question, AccentColor, TopicProgressEntry } from '@/lib/types';
-
-const FREE_TOPICS_LIMIT = 1;
 
 interface ExamTopicsPageProps {
   exam: ExamType;
@@ -59,14 +56,12 @@ export function ExamTopicsPage({
   const [{ overall, progressData, hardCount }] = useState(() =>
     computeExamProgress(exam, topics, getAllQuestions),
   );
-  const { user, loading } = useAuth();
 
   const passedTopics = Object.values(progressData).filter((p) => p.isPassed).length;
 
   const accentVar = accentColor === 'gold' ? 'var(--gold)' : 'var(--seafoam)';
   const accentBg = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.08)' : 'rgba(38, 136, 164, 0.08)';
   const accentBorder = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.18)' : 'rgba(38, 136, 164, 0.18)';
-  const lockBannerBorder = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.25)' : 'rgba(38, 136, 164, 0.25)';
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--navy-deep)' }}>
@@ -129,22 +124,6 @@ export function ExamTopicsPage({
           </span>
         </div>
 
-        {!loading && !user && (
-          <div
-            className="mb-5 px-4 py-3 rounded-lg flex items-center gap-3"
-            style={{ background: accentBg, border: `1px solid ${lockBannerBorder}` }}
-          >
-            <span style={{ color: accentVar }}>🔒</span>
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              Nur das erste Thema ist ohne Konto verfügbar.{' '}
-              <Link href="/auth/login" className="underline" style={{ color: accentVar }}>
-                Jetzt anmelden
-              </Link>{' '}
-              um alle {topics.length} Themen freizuschalten.
-            </p>
-          </div>
-        )}
-
         {hardCount > 0 && (
           <div className="mb-6">
             <h2 className="text-sm font-semibold mb-3" style={{ color: 'var(--white)' }}>
@@ -184,9 +163,8 @@ export function ExamTopicsPage({
         <div className="grid sm:grid-cols-2 gap-3">
           {topics
             .filter((t) => (progressData[t.id]?.total ?? 0) > 0)
-            .map((topic, index) => {
+            .map((topic) => {
               const pd = progressData[topic.id] ?? { passed: 0, total: 0, percentage: 0, isPassed: false };
-              const isLocked = !loading && !user && index >= FREE_TOPICS_LIMIT;
               return (
                 <TopicCard
                   key={topic.id}
@@ -196,7 +174,6 @@ export function ExamTopicsPage({
                   percentage={pd.percentage}
                   isPassed={pd.isPassed}
                   exam={exam}
-                  locked={isLocked}
                 />
               );
             })}

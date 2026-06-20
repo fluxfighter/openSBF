@@ -21,6 +21,66 @@ export function saveProgress(progress: UserProgress): void {
   if (typeof window === 'undefined') return;
   progress.lastUpdated = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  schedulePush(progress);
+}
+
+// ---------------------------------------------------------------------------
+// Server sync (single-user self-hosted backend at /api/state)
+// localStorage is the instant local cache; the server file is the cross-device
+// source of truth. Writes are debounced and best-effort; failures are ignored
+// so the app keeps working fully offline.
+// ---------------------------------------------------------------------------
+
+const SYNC_ENDPOINT = '/api/state';
+let pushTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPush: UserProgress | null = null;
+
+function schedulePush(progress: UserProgress): void {
+  if (typeof window === 'undefined') return;
+  pendingPush = progress;
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    pushTimer = null;
+    const payload = pendingPush;
+    pendingPush = null;
+    if (!payload) return;
+    void fetch(SYNC_ENDPOINT, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {
+      // offline / server unavailable — local cache already holds the data
+    });
+  }, 800);
+}
+
+/**
+ * Pull the server state and merge it into the local cache. Returns the merged
+ * progress, or null if nothing changed / the server is unreachable. Intended to
+ * run once on app start so a second device picks up progress made elsewhere.
+ */
+export async function pullServerProgress(): Promise<UserProgress | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const res = await fetch(SYNC_ENDPOINT, { method: 'GET', cache: 'no-store' });
+    if (!res.ok) return null;
+    const server: unknown = await res.json();
+    if (typeof server !== 'object' || server === null) return null;
+    const serverProgress = server as UserProgress;
+    if (!serverProgress.questions) return null;
+
+    const local = loadProgress();
+    const merged = mergeProgress(local, serverProgress);
+
+    const before = JSON.stringify(local.questions) + JSON.stringify(local.pruefungsboegen ?? {});
+    const after = JSON.stringify(merged.questions) + JSON.stringify(merged.pruefungsboegen ?? {});
+    if (before === after) return null;
+
+    saveProgress(merged);
+    return merged;
+  } catch {
+    return null;
+  }
 }
 
 export function getQuestionKey(questionId: number, exam: ExamType): string {

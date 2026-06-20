@@ -8,7 +8,6 @@ import type { Question, ExamType, AnswerKey, SessionStats } from '@/lib/types';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
-import { LoginPromptModal } from '@/components/ui/LoginPromptModal';
 import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import {
   loadProgress,
@@ -21,10 +20,8 @@ import {
   getTopicProgress,
   isTopicPassed,
 } from '@/lib/progress';
-import { useAuth } from '@/hooks/useAuth';
 import type { UserProgress } from '@/lib/types';
 
-const FREE_QUESTIONS_LIMIT = 10;
 const CORRECT_THRESHOLD = 3;
 const HARD_QUESTIONS_TOPIC_ID = 'schwierige-fragen';
 
@@ -110,9 +107,6 @@ export default function QuizPage(): React.ReactElement {
 
   const [sessionStats, setSessionStats] = useState<SessionStats>({ correct: 0, wrong: 0, total: 0 });
   const [isComplete, setIsComplete] = useState(false);
-  const { user, loading } = useAuth();
-
-  const showLoginPrompt = !loading && !user && sessionStats.total >= FREE_QUESTIONS_LIMIT;
 
   useEffect(() => {
     if (questions.length === 0) return;
@@ -247,7 +241,6 @@ export default function QuizPage(): React.ReactElement {
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ background: 'var(--navy-deep)' }}>
-      {showLoginPrompt && <LoginPromptModal questionsAnswered={sessionStats.total} />}
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <Link

@@ -3,6 +3,7 @@ import './globals.css';
 import { NavBar } from '@/components/layout/NavBar';
 import { Footer } from '@/components/layout/Footer';
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
+import { ProgressBootstrap } from '@/components/ui/ProgressBootstrap';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
         <main>{children}</main>
         <Footer />
         <ServiceWorkerRegistration />
+        <ProgressBootstrap />
         <div className="fixed bottom-6 right-4 z-40">
           <FeedbackModal
             trigger={

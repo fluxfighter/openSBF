@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for Docker/Unraid hosting.
+  output: 'standalone',
   turbopack: {
     root: __dirname,
   },
