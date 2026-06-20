@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
+import { getQueueCounts } from '@/lib/srs';
 import { getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { CertificateCard } from '@/components/ui/CertificateCard';
 
@@ -21,20 +22,30 @@ const tutorialLinks = [
   { href: '/navigation', label: 'Navigationsrechner' },
 ];
 
-function useExamProgress(): { binnenPct: number; seePct: number } {
-  const [binnenPct] = useState(() => {
+interface ExamHomeStats {
+  binnenPct: number;
+  seePct: number;
+  binnenDue: number;
+  seeDue: number;
+}
+
+function useExamProgress(): ExamHomeStats {
+  const [stats] = useState<ExamHomeStats>(() => {
     const progress = loadProgress();
-    return getExamOverallProgress(progress, getAllBinnenQuestions().map((q) => q.id), 'binnen').percentage;
+    const binnen = getAllBinnenQuestions();
+    const see = getAllSeeQuestions();
+    return {
+      binnenPct: getExamOverallProgress(progress, binnen.map((q) => q.id), 'binnen').percentage,
+      seePct: getExamOverallProgress(progress, see.map((q) => q.id), 'see').percentage,
+      binnenDue: getQueueCounts(progress, 'binnen', binnen).total,
+      seeDue: getQueueCounts(progress, 'see', see).total,
+    };
   });
-  const [seePct] = useState(() => {
-    const progress = loadProgress();
-    return getExamOverallProgress(progress, getAllSeeQuestions().map((q) => q.id), 'see').percentage;
-  });
-  return { binnenPct, seePct };
+  return stats;
 }
 
 export default function HomePage(): React.ReactElement {
-  const { binnenPct, seePct } = useExamProgress();
+  const { binnenPct, seePct, binnenDue, seeDue } = useExamProgress();
   const hasStarted = binnenPct > 0 || seePct > 0;
 
   const examCards = [
@@ -43,16 +54,20 @@ export default function HomePage(): React.ReactElement {
       sub: 'Binnenschifffahrtsstraßen',
       href: '/binnen',
       pct: binnenPct,
+      due: binnenDue,
       color: 'gold' as const,
       icon: '🚢',
+      exam: 'binnen' as const,
     },
     {
       title: 'SBF See',
       sub: 'Seeschifffahrtsstraßen',
       href: '/see',
       pct: seePct,
+      due: seeDue,
       color: 'seafoam' as const,
       icon: '⛵',
+      exam: 'see' as const,
     },
   ];
 
@@ -113,24 +128,37 @@ export default function HomePage(): React.ReactElement {
 
                 <ProgressBar value={card.pct} size="sm" color={card.color} />
 
-                <Link
-                  href={card.href}
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
-                  style={
-                    card.pct > 0
-                      ? {
-                          background: card.color === 'gold' ? 'rgba(188,147,50,0.12)' : 'rgba(77,201,176,0.12)',
-                          color: card.color === 'gold' ? 'var(--gold-light)' : 'var(--seafoam-light)',
-                          border: `1px solid ${card.color === 'gold' ? 'rgba(188,147,50,0.25)' : 'rgba(77,201,176,0.25)'}`,
-                        }
-                      : {
-                          background: card.color === 'gold' ? 'var(--gold)' : 'var(--seafoam)',
-                          color: 'var(--navy-deepest)',
-                        }
-                  }
-                >
-                  {card.pct > 0 ? 'Weiterüben →' : 'Starten →'}
-                </Link>
+                {card.due > 0 ? (
+                  <Link
+                    href={`/ueben/${card.exam}/heute`}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+                    style={{
+                      background: card.color === 'gold' ? 'var(--gold)' : 'var(--seafoam)',
+                      color: 'var(--navy-deepest)',
+                    }}
+                  >
+                    ⚡ Heute lernen · {card.due}
+                  </Link>
+                ) : (
+                  <Link
+                    href={card.href}
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
+                    style={
+                      card.pct > 0
+                        ? {
+                            background: card.color === 'gold' ? 'rgba(188,147,50,0.12)' : 'rgba(77,201,176,0.12)',
+                            color: card.color === 'gold' ? 'var(--gold-light)' : 'var(--seafoam-light)',
+                            border: `1px solid ${card.color === 'gold' ? 'rgba(188,147,50,0.25)' : 'rgba(77,201,176,0.25)'}`,
+                          }
+                        : {
+                            background: card.color === 'gold' ? 'var(--gold)' : 'var(--seafoam)',
+                            color: 'var(--navy-deepest)',
+                          }
+                    }
+                  >
+                    {card.pct > 0 ? 'Weiterüben →' : 'Starten →'}
+                  </Link>
+                )}
               </div>
             ))}
           </div>

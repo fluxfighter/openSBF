@@ -1,4 +1,5 @@
 import type { UserProgress, QuestionProgress, ExamType, Question, ExamResult } from './types';
+import { applyGrade, gradeFromCorrect } from './srs';
 
 const STORAGE_KEY = 'opensbf_progress';
 const CORRECT_THRESHOLD = 3;
@@ -92,9 +93,12 @@ export function recordAnswer(
   questionId: number,
   exam: ExamType,
   isCorrect: boolean,
+  easy = false,
 ): UserProgress {
   const key = getQuestionKey(questionId, exam);
   const existing = progress.questions[key];
+
+  const srs = applyGrade(existing, gradeFromCorrect(isCorrect, easy));
 
   const updated: QuestionProgress = {
     questionId,
@@ -102,6 +106,11 @@ export function recordAnswer(
     correctCount: isCorrect ? (existing?.correctCount ?? 0) + 1 : existing?.correctCount ?? 0,
     wrongCount: isCorrect ? (existing?.wrongCount ?? 0) : (existing?.wrongCount ?? 0) + 1,
     lastAnswered: new Date().toISOString(),
+    ease: srs.ease,
+    intervalDays: srs.intervalDays,
+    due: srs.due,
+    reps: srs.reps,
+    lapses: srs.lapses,
   };
 
   return {
@@ -178,8 +187,13 @@ export function mergeProgress(current: UserProgress, imported: UserProgress): Us
 
   for (const [key, importedQ] of Object.entries(imported.questions)) {
     const existing = merged[key];
+    // Counts accumulate (max wins); for the SRS schedule keep the entry that was
+    // answered most recently, so the freshest device's review state survives.
+    const importedNewer =
+      !existing || new Date(importedQ.lastAnswered).getTime() >= new Date(existing.lastAnswered).getTime();
+    const fresher = importedNewer ? importedQ : existing;
     merged[key] = {
-      ...importedQ,
+      ...fresher,
       correctCount: Math.max(importedQ.correctCount, existing?.correctCount ?? 0),
       wrongCount: Math.max(importedQ.wrongCount ?? 0, existing?.wrongCount ?? 0),
     };

@@ -20,10 +20,12 @@ import {
   getTopicProgress,
   isTopicPassed,
 } from '@/lib/progress';
+import { buildDailyQueue } from '@/lib/srs';
 import type { UserProgress } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
 const HARD_QUESTIONS_TOPIC_ID = 'schwierige-fragen';
+const DAILY_QUEUE_TOPIC_ID = 'heute';
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -44,8 +46,13 @@ function getTopicQuestions(topicId: string, exam: ExamType): Question[] {
 
 function getTopicName(topicId: string, exam: ExamType): string {
   if (topicId === HARD_QUESTIONS_TOPIC_ID) return 'Deine Problemfragen';
+  if (topicId === DAILY_QUEUE_TOPIC_ID) return 'Heute lernen';
   const topics = exam === 'binnen' ? binnenTopics : seeTopics;
   return topics.find((t) => t.id === topicId)?.name ?? topicId;
+}
+
+function isQueueMode(topicId: string): boolean {
+  return topicId === HARD_QUESTIONS_TOPIC_ID || topicId === DAILY_QUEUE_TOPIC_ID;
 }
 
 type ShuffledOption = { key: AnswerKey; text: string; originalKey: AnswerKey };
@@ -75,7 +82,9 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizS
   const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
 
   let questions: Question[];
-  if (topicId === HARD_QUESTIONS_TOPIC_ID) {
+  if (topicId === DAILY_QUEUE_TOPIC_ID) {
+    questions = buildDailyQueue(progress, exam, allQuestions);
+  } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
   } else {
     const topicQuestions = getTopicQuestions(topicId, exam);
@@ -94,6 +103,7 @@ export default function QuizPage(): React.ReactElement {
   const params = useParams();
   const exam = params.exam as ExamType;
   const topicId = params.topic as string;
+  const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
 
   const initialQ =
     typeof window !== 'undefined'
@@ -138,6 +148,17 @@ export default function QuizPage(): React.ReactElement {
 
   const handleNext = useCallback((): void => {
     if (currentIdx + 1 >= questions.length) {
+      if (topicId === DAILY_QUEUE_TOPIC_ID) {
+        // Re-queue cards still due (e.g. just answered "again") without pulling
+        // in new ones, so the session keeps going until today's queue is clear.
+        const stillDue = buildDailyQueue(progress, exam, allQuestions, { includeNew: false });
+        if (stillDue.length === 0) {
+          setIsComplete(true);
+          return;
+        }
+        setQuiz((prev) => ({ ...prev, questions: stillDue, currentIdx: 0, view: makeView(stillDue[0]) }));
+        return;
+      }
       if (topicId === HARD_QUESTIONS_TOPIC_ID) {
         setIsComplete(true);
         return;
@@ -161,7 +182,7 @@ export default function QuizPage(): React.ReactElement {
       currentIdx: prev.currentIdx + 1,
       view: makeView(prev.questions[prev.currentIdx + 1]),
     }));
-  }, [currentIdx, questions, topicId, exam, progress]);
+  }, [currentIdx, questions, topicId, exam, progress, allQuestions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
@@ -180,11 +201,17 @@ export default function QuizPage(): React.ReactElement {
   }, [isRevealed, handleNext, handleSelect]);
 
   if (questions.length === 0) {
-    const isHardModeEmpty = topicId === HARD_QUESTIONS_TOPIC_ID;
+    const queueEmpty = isQueueMode(topicId);
+    const emptyTitle =
+      topicId === DAILY_QUEUE_TOPIC_ID ? 'Für heute geschafft' : 'Keine Problemfragen';
+    const emptyText =
+      topicId === DAILY_QUEUE_TOPIC_ID
+        ? 'Es sind keine Karten fällig. Komm morgen wieder oder lerne ein Thema gezielt.'
+        : 'Du hast noch keine Frage falsch beantwortet — weiter so!';
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--navy-deep)' }}>
         <div className="text-center max-w-xs">
-          {isHardModeEmpty ? (
+          {queueEmpty ? (
             <>
               <div
                 className="w-12 h-12 rounded-full flex items-center justify-center text-xl mb-4 mx-auto"
@@ -193,10 +220,10 @@ export default function QuizPage(): React.ReactElement {
                 ✓
               </div>
               <p className="text-base font-semibold mb-2" style={{ color: 'var(--white)' }}>
-                Keine Problemfragen
+                {emptyTitle}
               </p>
               <p className="text-sm mb-6" style={{ color: 'var(--muted)' }}>
-                Du hast noch keine Frage falsch beantwortet — weiter so!
+                {emptyText}
               </p>
               <Link
                 href={`/${exam}`}
@@ -234,10 +261,21 @@ export default function QuizPage(): React.ReactElement {
   const currentQuestion = questions[currentIdx];
   const correctCount = getQuestionCorrectCount(progress, currentQuestion.id, exam);
   const wrongCount = getQuestionWrongCount(progress, currentQuestion.id, exam);
-  const isHardMode = topicId === HARD_QUESTIONS_TOPIC_ID;
-  const topicQuestions = isHardMode ? questions : getTopicQuestions(topicId, exam);
-  const topicProgress = getTopicProgress(progress, topicQuestions.map((q) => q.id), exam);
+  const queueMode = isQueueMode(topicId);
+  const topicQuestions = queueMode ? questions : getTopicQuestions(topicId, exam);
   const totalQuestions = topicQuestions.length;
+  // In queue modes the bar tracks this session's progress through the deck;
+  // for a topic it tracks how many of its questions are mastered.
+  const topicProgress = queueMode
+    ? {
+        passed: Math.min(sessionStats.total, totalQuestions),
+        total: totalQuestions,
+        percentage: totalQuestions > 0 ? Math.round((Math.min(sessionStats.total, totalQuestions) / totalQuestions) * 100) : 0,
+      }
+    : getTopicProgress(progress, topicQuestions.map((q) => q.id), exam);
+  const progressLabel = queueMode
+    ? `${topicProgress.passed}/${totalQuestions} bearbeitet`
+    : `${topicProgress.passed}/${totalQuestions} bestanden`;
 
   return (
     <div className="min-h-screen py-8 px-4" style={{ background: 'var(--navy-deep)' }}>
@@ -277,7 +315,7 @@ export default function QuizPage(): React.ReactElement {
             size="sm"
             color={topicProgress.percentage === 100 ? 'green' : 'gold'}
             showLabel
-            label={`${topicProgress.passed}/${totalQuestions} bestanden`}
+            label={progressLabel}
           />
         </div>
 
@@ -475,7 +513,15 @@ function CompletionScreen({
   isHardMode,
 }: CompletionScreenProps): React.ReactElement {
   const topicName = getTopicName(topicId, exam);
+  const isDaily = topicId === DAILY_QUEUE_TOPIC_ID;
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
+
+  const title = isDaily ? 'Tagesziel erreicht' : isHardMode ? 'Gut gemacht!' : 'Thema bestanden';
+  const subtitle = isDaily
+    ? 'Alle fälligen Karten für heute gelernt 🎉'
+    : isHardMode
+      ? 'Du hast alle Problemfragen geübt'
+      : topicName;
 
   const stats: Array<{ label: string; value: number | string; color: string }> = [
     { label: 'Richtig',     value: sessionStats.correct, color: 'var(--green-signal)' },
@@ -506,10 +552,10 @@ function CompletionScreen({
           className="text-xl font-bold mb-1 text-center"
           style={{ fontFamily: 'Playfair Display, serif', color: 'var(--white)' }}
         >
-          {isHardMode ? 'Gut gemacht!' : 'Thema bestanden'}
+          {title}
         </h2>
         <p className="text-sm mb-7 text-center" style={{ color: 'var(--muted)' }}>
-          {isHardMode ? 'Du hast alle Problemfragen geübt' : topicName}
+          {subtitle}
         </p>
 
         <div className="grid grid-cols-3 gap-2 mb-7">

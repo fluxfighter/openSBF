@@ -30,12 +30,21 @@ export interface Topic {
   questionIds: number[];
 }
 
+export type SrsGrade = 'again' | 'good' | 'easy';
+
 export interface QuestionProgress {
   questionId: number;
   exam: ExamType;
   correctCount: number;
   wrongCount: number;
   lastAnswered: string;
+  // Spaced-repetition scheduling (SM-2-light). Optional so progress data
+  // written before SRS existed keeps loading; backfilled on next answer.
+  ease?: number; // ease factor, >= 1.3
+  intervalDays?: number; // current review interval in days
+  due?: string; // ISO timestamp of next review
+  reps?: number; // consecutive successful reviews
+  lapses?: number; // number of times the card was forgotten
 }
 
 export interface TopicProgress {

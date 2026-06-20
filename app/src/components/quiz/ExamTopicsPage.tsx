@@ -11,6 +11,7 @@ import {
   getExamOverallProgress,
   getHardestQuestions,
 } from '@/lib/progress';
+import { getQueueCounts, getReadiness, type QueueCounts } from '@/lib/srs';
 import type { ExamType, Topic, Question, AccentColor, TopicProgressEntry } from '@/lib/types';
 
 interface ExamTopicsPageProps {
@@ -24,11 +25,19 @@ interface ExamTopicsPageProps {
   quickLinks?: React.ReactNode;
 }
 
+interface ExamProgressSnapshot {
+  overall: { passed: number; total: number; percentage: number };
+  progressData: Record<string, TopicProgressEntry>;
+  hardCount: number;
+  queue: QueueCounts;
+  readiness: number;
+}
+
 function computeExamProgress(
   exam: ExamType,
   topics: Topic[],
   getAllQuestions: () => Question[],
-): { overall: { passed: number; total: number; percentage: number }; progressData: Record<string, TopicProgressEntry>; hardCount: number } {
+): ExamProgressSnapshot {
   const progress = loadProgress();
   const allQuestions = getAllQuestions();
   const allIds = allQuestions.map((q) => q.id);
@@ -40,7 +49,13 @@ function computeExamProgress(
   });
 
   const hardCount = getHardestQuestions(progress, exam, allQuestions).length;
-  return { overall: getExamOverallProgress(progress, allIds, exam), progressData, hardCount };
+  return {
+    overall: getExamOverallProgress(progress, allIds, exam),
+    progressData,
+    hardCount,
+    queue: getQueueCounts(progress, exam, allQuestions),
+    readiness: getReadiness(progress, exam, allQuestions).percentage,
+  };
 }
 
 export function ExamTopicsPage({
@@ -53,7 +68,7 @@ export function ExamTopicsPage({
   explanationContent,
   quickLinks,
 }: ExamTopicsPageProps): React.ReactElement {
-  const [{ overall, progressData, hardCount }] = useState(() =>
+  const [{ overall, progressData, hardCount, queue, readiness }] = useState(() =>
     computeExamProgress(exam, topics, getAllQuestions),
   );
 
@@ -115,6 +130,55 @@ export function ExamTopicsPage({
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-10">
+        {/* Primary action: today's spaced-repetition queue */}
+        <Link
+          href={`/ueben/${exam}/heute`}
+          className="block mb-8 rounded-2xl p-5 sm:p-6 transition-opacity hover:opacity-95"
+          style={{
+            background: `linear-gradient(135deg, ${accentBg}, rgba(255,255,255,0.02))`,
+            border: `1px solid ${accentBorder}`,
+          }}
+        >
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg leading-none">⚡</span>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--white)' }}>
+                  Heute lernen
+                </h2>
+              </div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                {queue.total > 0 ? (
+                  <>
+                    <span style={{ color: accentVar, fontWeight: 600 }}>{queue.total} Karten</span> fällig
+                    {queue.fresh > 0 && ` · ${queue.fresh} neu`}
+                  </>
+                ) : (
+                  'Alles erledigt — komm später wieder oder übe ein Thema gezielt.'
+                )}
+              </p>
+            </div>
+            <span
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold shrink-0"
+              style={{ background: accentVar, color: 'var(--navy-deepest)' }}
+            >
+              {queue.total > 0 ? 'Start →' : 'Wiederholen →'}
+            </span>
+          </div>
+
+          <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                Prüfungsreife
+              </span>
+              <span className="text-xs font-semibold tabular-nums" style={{ color: accentVar }}>
+                {readiness}%
+              </span>
+            </div>
+            <ProgressBar value={readiness} size="sm" color={accentColor} />
+          </div>
+        </Link>
+
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
             Themengebiete
