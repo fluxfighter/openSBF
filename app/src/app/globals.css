@@ -64,6 +64,11 @@ h1, h2, h3 {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Focus mode (during a quiz session): hide the global nav for immersion. */
+html[data-focus-mode] nav {
+  display: none;
+}
+
 /* Keyboard focus stays visible & on-brand, mouse/touch stays clean. */
 :focus-visible {
   outline: 2px solid var(--gold-light);
@@ -148,11 +153,33 @@ button, a {
 .answer-option.correct {
   background: rgba(18, 184, 112, 0.10);
   border-color: rgba(18, 184, 112, 0.45);
+  animation: answer-pop 0.35s ease;
 }
 
 .answer-option.wrong {
   background: rgba(232, 68, 68, 0.10);
   border-color: rgba(232, 68, 68, 0.45);
+  animation: answer-shake 0.34s ease;
+}
+
+@keyframes answer-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+
+@keyframes answer-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+/* Respect reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  .answer-option.correct,
+  .answer-option.wrong { animation: none; }
 }
 
 .answer-option.disabled {

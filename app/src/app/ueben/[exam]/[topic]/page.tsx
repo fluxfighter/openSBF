@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Question, ExamType, AnswerKey, SessionStats } from '@/lib/types';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
@@ -18,7 +17,6 @@ import {
   getQuestionCorrectCount,
   getQuestionWrongCount,
   getHardestQuestions,
-  getTopicProgress,
   isTopicPassed,
 } from '@/lib/progress';
 import { buildDailyQueue } from '@/lib/srs';
@@ -237,6 +235,13 @@ export default function QuizPage(): React.ReactElement {
     return () => window.removeEventListener('keydown', handler);
   }, [isRevealed, handleNext, handleSelect, handleBack, currentIdx]);
 
+  // Immersive focus mode: hide the global nav while a session is running so the
+  // learner's attention stays on the card (the ✕ is the explicit exit).
+  useEffect(() => {
+    document.documentElement.setAttribute('data-focus-mode', 'true');
+    return () => document.documentElement.removeAttribute('data-focus-mode');
+  }, []);
+
   // The deck is built from localStorage + Math.random, so it only exists on the
   // client. Render a stable placeholder until mounted to avoid a hydration
   // mismatch (which previously cascaded into a broken page on back/forward nav).
@@ -309,62 +314,35 @@ export default function QuizPage(): React.ReactElement {
   const currentQuestion = questions[currentIdx];
   const correctCount = getQuestionCorrectCount(progress, currentQuestion.id, exam);
   const wrongCount = getQuestionWrongCount(progress, currentQuestion.id, exam);
-  const queueMode = isQueueMode(topicId);
-  const topicQuestions = queueMode ? questions : getTopicQuestions(topicId, exam);
-  const totalQuestions = topicQuestions.length;
-  // In queue modes the bar tracks this session's progress through the deck;
-  // for a topic it tracks how many of its questions are mastered.
-  const topicProgress = queueMode
-    ? {
-        passed: Math.min(sessionStats.total, totalQuestions),
-        total: totalQuestions,
-        percentage: totalQuestions > 0 ? Math.round((Math.min(sessionStats.total, totalQuestions) / totalQuestions) * 100) : 0,
-      }
-    : getTopicProgress(progress, topicQuestions.map((q) => q.id), exam);
-  const progressLabel = queueMode
-    ? `${topicProgress.passed}/${totalQuestions} bearbeitet`
-    : `${topicProgress.passed}/${totalQuestions} bestanden`;
+  // Session progress through the deck — fills as you answer (Duolingo-style).
+  const sessionPct = Math.round(((currentIdx + (isRevealed ? 1 : 0)) / questions.length) * 100);
+  const barColor = exam === 'binnen' ? 'var(--gold)' : 'var(--seafoam)';
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{ background: 'var(--navy-deep)' }}>
+    <div className="min-h-screen py-6 px-4" style={{ background: 'var(--navy-deep)' }}>
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        {/* Focus session header: exit · progress · tally */}
+        <div className="flex items-center gap-3 mb-6">
           <Link
             href={`/${exam}`}
-            className="text-xs font-medium transition-opacity hover:opacity-70"
+            aria-label="Beenden"
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-base transition-colors hover:bg-white/5"
             style={{ color: 'var(--muted)' }}
           >
-            ← {exam === 'binnen' ? 'SBF Binnen' : 'SBF See'}
+            ✕
           </Link>
+          <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+            <div
+              className="h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${sessionPct}%`, background: barColor }}
+            />
+          </div>
           {sessionStats.total > 0 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span
-                className="px-2 py-0.5 rounded"
-                style={{ background: 'rgba(18, 184, 112, 0.10)', color: 'var(--green-signal)' }}
-              >
-                {sessionStats.correct} ✓
-              </span>
-              <span
-                className="px-2 py-0.5 rounded"
-                style={{ background: 'rgba(232, 68, 68, 0.10)', color: 'var(--red-signal)' }}
-              >
-                {sessionStats.wrong} ✗
-              </span>
+            <div className="flex items-center gap-2 text-xs shrink-0 tabular-nums">
+              <span style={{ color: 'var(--green-signal)' }}>{sessionStats.correct}&nbsp;✓</span>
+              <span style={{ color: 'var(--red-signal)' }}>{sessionStats.wrong}&nbsp;✗</span>
             </div>
           )}
-        </div>
-
-        <div className="mb-5">
-          <h1 className="text-base font-semibold mb-2" style={{ color: 'var(--white)' }}>
-            {getTopicName(topicId, exam)}
-          </h1>
-          <ProgressBar
-            value={topicProgress.percentage}
-            size="sm"
-            color={topicProgress.percentage === 100 ? 'green' : 'gold'}
-            showLabel
-            label={progressLabel}
-          />
         </div>
 
         <motion.div
