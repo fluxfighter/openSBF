@@ -22,6 +22,7 @@ import {
   isTopicPassed,
 } from '@/lib/progress';
 import { buildDailyQueue } from '@/lib/srs';
+import { useMounted } from '@/hooks/useMounted';
 import type { UserProgress } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
@@ -120,14 +121,10 @@ export default function QuizPage(): React.ReactElement {
   const exam = params.exam as ExamType;
   const topicId = params.topic as string;
   const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
-
-  const initialQ =
-    typeof window !== 'undefined'
-      ? parseInt(new URLSearchParams(window.location.search).get('q') ?? '0', 10)
-      : 0;
+  const mounted = useMounted();
 
   const [{ progress, questions, currentIdx, view }, setQuiz] = useState<QuizState>(() =>
-    initQuizState(topicId, exam, initialQ),
+    initQuizState(topicId, exam, 0),
   );
   const { options: shuffledOptions, selectedAnswer, isRevealed } = view;
 
@@ -137,11 +134,6 @@ export default function QuizPage(): React.ReactElement {
   const [pendingAdvance, setPendingAdvance] = useState(false);
 
   const canGoBack = currentIdx > 0 && !pendingAdvance;
-
-  useEffect(() => {
-    if (questions.length === 0) return;
-    window.history.replaceState(null, '', `?q=${currentIdx}`);
-  }, [currentIdx, questions.length]);
 
   const handleSelect = useCallback(
     (key: AnswerKey): void => {
@@ -244,6 +236,17 @@ export default function QuizPage(): React.ReactElement {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [isRevealed, handleNext, handleSelect, handleBack, currentIdx]);
+
+  // The deck is built from localStorage + Math.random, so it only exists on the
+  // client. Render a stable placeholder until mounted to avoid a hydration
+  // mismatch (which previously cascaded into a broken page on back/forward nav).
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--navy-deep)' }}>
+        <p className="text-sm" style={{ color: 'var(--muted)' }}>Lade Fragen…</p>
+      </div>
+    );
+  }
 
   if (questions.length === 0) {
     const queueEmpty = isQueueMode(topicId);

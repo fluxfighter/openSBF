@@ -12,6 +12,7 @@ import {
   getHardestQuestions,
 } from '@/lib/progress';
 import { getQueueCounts, getReadiness, type QueueCounts } from '@/lib/srs';
+import { useMounted } from '@/hooks/useMounted';
 import type { ExamType, Topic, Question, AccentColor, TopicProgressEntry } from '@/lib/types';
 
 interface ExamTopicsPageProps {
@@ -68,6 +69,7 @@ export function ExamTopicsPage({
   explanationContent,
   quickLinks,
 }: ExamTopicsPageProps): React.ReactElement {
+  const mounted = useMounted();
   const [{ overall, progressData, hardCount, queue, readiness }] = useState(() =>
     computeExamProgress(exam, topics, getAllQuestions),
   );
@@ -77,6 +79,35 @@ export function ExamTopicsPage({
   const accentVar = accentColor === 'gold' ? 'var(--gold)' : 'var(--seafoam)';
   const accentBg = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.08)' : 'rgba(38, 136, 164, 0.08)';
   const accentBorder = accentColor === 'gold' ? 'rgba(188, 147, 50, 0.18)' : 'rgba(38, 136, 164, 0.18)';
+
+  // Header is static (props); the progress-derived body waits for mount to keep
+  // SSR and the first client render identical (no hydration mismatch).
+  if (!mounted) {
+    return (
+      <div className="min-h-screen" style={{ background: 'var(--navy-deep)' }}>
+        <div className="border-b px-4 py-10" style={{ borderColor: 'var(--border)' }}>
+          <div className="max-w-5xl mx-auto">
+            <Link
+              href="/"
+              className="text-xs font-medium mb-6 inline-block transition-opacity hover:opacity-70"
+              style={{ color: 'var(--muted)' }}
+            >
+              ← Start
+            </Link>
+            <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--white)' }}>
+              {title}
+            </h1>
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>
+              {subtitle}
+            </p>
+          </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 py-10">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Lädt…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--navy-deep)' }}>

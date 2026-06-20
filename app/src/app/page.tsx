@@ -6,6 +6,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
 import { getQueueCounts } from '@/lib/srs';
 import { getStreak, getXp, getTodayCount, DAILY_GOAL } from '@/lib/gamification';
+import { useMounted } from '@/hooks/useMounted';
 import { getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { CertificateCard } from '@/components/ui/CertificateCard';
 
@@ -33,6 +34,16 @@ interface ExamHomeStats {
   today: number;
 }
 
+const ZERO_STATS: ExamHomeStats = {
+  binnenPct: 0,
+  seePct: 0,
+  binnenDue: 0,
+  seeDue: 0,
+  streak: 0,
+  xp: 0,
+  today: 0,
+};
+
 function useExamProgress(): ExamHomeStats {
   const [stats] = useState<ExamHomeStats>(() => {
     const progress = loadProgress();
@@ -52,7 +63,10 @@ function useExamProgress(): ExamHomeStats {
 }
 
 export default function HomePage(): React.ReactElement {
-  const { binnenPct, seePct, binnenDue, seeDue, streak, xp, today } = useExamProgress();
+  const mounted = useMounted();
+  const raw = useExamProgress();
+  // Until mounted, render neutral zeros so SSR and the first client render match.
+  const { binnenPct, seePct, binnenDue, seeDue, streak, xp, today } = mounted ? raw : ZERO_STATS;
   const goalReached = today >= DAILY_GOAL;
 
   const examCards = [

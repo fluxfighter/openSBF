@@ -11,6 +11,7 @@ import {
 import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ProgressSync } from '@/components/ui/ProgressSync';
+import { useMounted } from '@/hooks/useMounted';
 import type { UserProgress, ExamType } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
@@ -206,6 +207,7 @@ function ExamSection({ title, icon, href, stats }: ExamSectionProps) {
 }
 
 export default function ProfilPage(): React.ReactElement {
+  const mounted = useMounted();
   const [progress, setProgress] = useState<UserProgress>(loadProgress);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -213,6 +215,33 @@ export default function ProfilPage(): React.ReactElement {
     resetProgress();
     setProgress(loadProgress());
     setShowResetConfirm(false);
+  }
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen" style={{ background: 'var(--navy-deep)' }}>
+        <div className="border-b px-4 py-10" style={{ borderColor: 'var(--border)' }}>
+          <div className="max-w-3xl mx-auto">
+            <Link
+              href="/"
+              className="text-xs font-medium mb-6 inline-block transition-opacity hover:opacity-70"
+              style={{ color: 'var(--muted)' }}
+            >
+              ← Start
+            </Link>
+            <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--white)' }}>
+              Mein Profil
+            </h1>
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>
+              Dein persönlicher Lernfortschritt auf einen Blick
+            </p>
+          </div>
+        </div>
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Lädt…</p>
+        </div>
+      </div>
+    );
   }
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
