@@ -123,9 +123,20 @@ export function recordAnswer(
   };
 }
 
+/**
+ * Current consecutive-correct streak toward mastery. Uses the SRS `reps`
+ * (resets to 0 on a wrong answer), so mastery honestly reflects retention —
+ * a forgotten question drops below the threshold again. Falls back to the
+ * cumulative correctCount for legacy entries written before SRS existed.
+ */
+export function getQuestionStreak(progress: UserProgress, questionId: number, exam: ExamType): number {
+  const e = progress.questions[getQuestionKey(questionId, exam)];
+  if (!e) return 0;
+  return e.reps ?? e.correctCount ?? 0;
+}
+
 export function isQuestionPassed(progress: UserProgress, questionId: number, exam: ExamType): boolean {
-  const key = getQuestionKey(questionId, exam);
-  return (progress.questions[key]?.correctCount ?? 0) >= CORRECT_THRESHOLD;
+  return getQuestionStreak(progress, questionId, exam) >= CORRECT_THRESHOLD;
 }
 
 export function getQuestionCorrectCount(progress: UserProgress, questionId: number, exam: ExamType): number {

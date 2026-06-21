@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
 import { getQueueCounts, getReadiness } from '@/lib/srs';
-import { getStreak, getXp, getTodayCount } from '@/lib/gamification';
+import { getStreak, getTodayCount, getAccuracy, getMotivation } from '@/lib/gamification';
 import { isBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
 import { getBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
@@ -21,7 +21,7 @@ interface ExamHomeStats {
   binnenDue: number;
   seeDue: number;
   streak: number;
-  xp: number;
+  accuracy: number | null;
   today: number;
 }
 
@@ -35,7 +35,7 @@ const ZERO_STATS: ExamHomeStats = {
   binnenDue: 0,
   seeDue: 0,
   streak: 0,
-  xp: 0,
+  accuracy: null,
   today: 0,
 };
 
@@ -56,7 +56,7 @@ function useExamProgress(): ExamHomeStats {
       binnenDue: getQueueCounts(progress, 'binnen', binnen).total,
       seeDue: getQueueCounts(progress, 'see', see).total,
       streak: getStreak(progress),
-      xp: getXp(progress),
+      accuracy: getAccuracy(progress),
       today: getTodayCount(progress),
     };
   });
@@ -68,7 +68,7 @@ export default function HomePage(): React.ReactElement {
   const raw = useExamProgress();
   // Until mounted, render neutral zeros so SSR and the first client render match.
   const stats = mounted ? raw : ZERO_STATS;
-  const { binnenMastered, seeMastered, binnenDue, seeDue, streak, xp, today } = stats;
+  const { binnenMastered, seeMastered, binnenDue, seeDue, streak, accuracy, today } = stats;
 
   // One coherent "today": progress toward clearing the cards actually due today
   // (answered today + still due), so the home goal == the learning queue.
@@ -76,6 +76,14 @@ export default function HomePage(): React.ReactElement {
   const todayTarget = today + dueTotal;
   const todayPct = todayTarget > 0 ? Math.round((today / todayTarget) * 100) : 0;
   const goalReached = today > 0 && dueTotal === 0;
+
+  const motivation = getMotivation({
+    streak,
+    todayCount: today,
+    dueTotal,
+    readiness: Math.max(stats.binnenReady, stats.seeReady),
+    seen: stats.binnenSeen + stats.seeSeen,
+  });
 
   const examCards = [
     {
@@ -142,10 +150,10 @@ export default function HomePage(): React.ReactElement {
               style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
             >
               <div className="text-xl font-bold tabular-nums" style={{ color: 'var(--seafoam-light)' }}>
-                {xp}
+                {accuracy === null ? '–' : `${accuracy}%`}
               </div>
               <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                XP
+                Quote richtig
               </div>
             </div>
           </div>
@@ -155,6 +163,17 @@ export default function HomePage(): React.ReactElement {
               <ProgressBar value={todayPct} size="sm" color="seafoam" />
             </div>
           )}
+
+          {/* Motivation box — reacts to streak / readiness / daily milestones */}
+          <div
+            className="mt-4 flex items-start gap-3 rounded-xl px-4 py-3"
+            style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}
+          >
+            <span className="text-lg leading-none mt-0.5">{motivation.emoji}</span>
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--white)' }}>
+              {motivation.text}
+            </p>
+          </div>
         </div>
       </section>
 

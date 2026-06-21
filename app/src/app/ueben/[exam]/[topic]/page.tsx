@@ -8,13 +8,14 @@ import Link from 'next/link';
 import type { Question, ExamType, AnswerKey, SessionStats } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
 import { getExamQuestions, getExamTopics } from '@/data/topics';
+import { tutorialForTopic } from '@/data/tutorials';
 import { isBinnenZusatzOnly } from '@/lib/settings';
 import {
   loadProgress,
   saveProgress,
   recordAnswer,
   isQuestionPassed,
-  getQuestionCorrectCount,
+  getQuestionStreak,
   getQuestionWrongCount,
   getHardestQuestions,
   isTopicPassed,
@@ -111,8 +112,10 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
   return { progress, questions, currentIdx, view, answered: {} };
 }
 
-// Delay before auto-advancing after a correct answer (ms).
+// Delay before auto-advancing after a correct answer (ms). Longer when there's
+// an explanation to glance at, shorter for plain correct answers.
 const AUTO_ADVANCE_MS = 750;
+const AUTO_ADVANCE_HINT_MS = 2600;
 
 // In-session relearning steps: a missed question must be answered correctly
 // again after each of these gaps (in cards) before it's done for the session.
@@ -259,12 +262,14 @@ export default function QuizPage(): React.ReactElement {
     });
   }, []);
 
-  // Auto-advance shortly after a correct answer.
+  // Auto-advance after a correct answer. Linger longer when there's an
+  // explanation to read, so the "why" actually registers before moving on.
   useEffect(() => {
     if (!pendingAdvance) return;
-    const t = setTimeout(() => handleNext(), AUTO_ADVANCE_MS);
+    const hasHint = Boolean(questions[currentIdx]?.hint);
+    const t = setTimeout(() => handleNext(), hasHint ? AUTO_ADVANCE_HINT_MS : AUTO_ADVANCE_MS);
     return () => clearTimeout(t);
-  }, [pendingAdvance, handleNext]);
+  }, [pendingAdvance, handleNext, questions, currentIdx]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
@@ -363,8 +368,10 @@ export default function QuizPage(): React.ReactElement {
   }
 
   const currentQuestion = questions[currentIdx];
-  const correctCount = getQuestionCorrectCount(progress, currentQuestion.id, exam);
+  const masteryStreak = getQuestionStreak(progress, currentQuestion.id, exam);
   const wrongCount = getQuestionWrongCount(progress, currentQuestion.id, exam);
+  const isAnswerCorrect = isRevealed && selectedAnswer === currentQuestion.correctAnswer;
+  const tutorialId = tutorialForTopic(currentQuestion.topic, exam);
   // Session progress through the deck — fills as you answer (Duolingo-style).
   const sessionPct = Math.round(((currentIdx + (isRevealed ? 1 : 0)) / questions.length) * 100);
   const barColor = exam === 'binnen' ? 'var(--gold)' : 'var(--seafoam)';
@@ -442,8 +449,8 @@ export default function QuizPage(): React.ReactElement {
                     key={i}
                     className="w-2 h-2 rounded-full border transition-all"
                     style={{
-                      background: i < correctCount ? 'var(--green-signal)' : 'transparent',
-                      borderColor: i < correctCount ? 'var(--green-signal)' : 'rgba(255,255,255,0.15)',
+                      background: i < masteryStreak ? 'var(--green-signal)' : 'transparent',
+                      borderColor: i < masteryStreak ? 'var(--green-signal)' : 'rgba(255,255,255,0.15)',
                     }}
                   />
                 ))}
@@ -554,12 +561,23 @@ export default function QuizPage(): React.ReactElement {
                   ? 'Richtig'
                   : `Falsch — Richtig wäre Antwort ${['A', 'B', 'C', 'D'][shuffledOptions.findIndex((o) => o.originalKey === currentQuestion.correctAnswer)]}`}
               </span>
-              {selectedAnswer !== currentQuestion.correctAnswer && currentQuestion.hint && (
+              {currentQuestion.hint && (
                 <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
                   {currentQuestion.hint}
                 </p>
               )}
-              {!pendingAdvance && (
+              {tutorialId && (
+                <Link
+                  href={`/lernen/${tutorialId}`}
+                  className="mt-2.5 inline-flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+                  style={{ color: exam === 'binnen' ? 'var(--gold-light)' : 'var(--seafoam-light)' }}
+                >
+                  Mehr dazu in der Theorie →
+                </Link>
+              )}
+              {/* Hide the button only for a plain correct answer (it auto-advances
+                  fast); show it for wrong answers and correct-with-explanation. */}
+              {(!pendingAdvance || (isAnswerCorrect && currentQuestion.hint)) && (
                 <button
                   onClick={handleNext}
                   autoFocus

@@ -1,9 +1,34 @@
+import type { ExamType } from '@/lib/types';
+
 export interface TutorialSection {
   id: string;
   title: string;
   content: string;
   exam: 'binnen' | 'see' | 'both';
   videoUrl?: string;
+}
+
+// Maps a question topic to the most relevant theory article (exam-aware), so a
+// question can offer a "Mehr dazu" link. Topics without a good match return null.
+const TUTORIAL_BY_TOPIC: Record<string, { binnen?: string; see?: string; both?: string }> = {
+  lichter: { binnen: 'lichter-grundlagen', see: 'lichter-see', both: 'lichter-grundlagen' },
+  ausweichregeln: { binnen: 'ausweichregeln-binnen', see: 'ausweichregeln-kvr' },
+  schallzeichen: { binnen: 'schallzeichen-binnen', see: 'schallzeichen-see' },
+  seezeichen: { both: 'seezeichen' },
+  schifffahrtszeichen: { binnen: 'betonnung-binnen', see: 'seezeichen' },
+  navigation: { both: 'navigation-grundlagen' },
+  wetter: { both: 'wetter-grundlagen' },
+  sicherheit: { both: 'sicherheit-ausruestung' },
+  seenotrettung: { both: 'sicherheit-ausruestung' },
+  seemannschaft: { both: 'seemannschaft' },
+  schleusen: { both: 'schleusen' },
+};
+
+/** Theory-article id for a question topic, or null if there's no good match. */
+export function tutorialForTopic(topic: string, exam: ExamType): string | null {
+  const m = TUTORIAL_BY_TOPIC[topic];
+  if (!m) return null;
+  return (exam === 'see' ? m.see : m.binnen) ?? m.both ?? null;
 }
 
 export const tutorials: TutorialSection[] = [

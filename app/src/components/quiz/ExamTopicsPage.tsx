@@ -244,9 +244,13 @@ export function ExamTopicsPage({
           <h2 className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
             Themengebiete
           </h2>
-          <span className="text-xs" style={{ color: 'var(--muted)' }}>
-            3× richtig = bestanden
-          </span>
+          <Link
+            href={`/${exam}/fragen`}
+            className="text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ color: accentVar }}
+          >
+            Alle Fragen ansehen →
+          </Link>
         </div>
 
         {hardCount > 0 && (

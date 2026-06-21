@@ -68,3 +68,60 @@ export function getXp(progress: UserProgress): number {
 export function getStudyDays(progress: UserProgress): number {
   return studyDayKeys(progress).size;
 }
+
+/**
+ * Overall hit rate: share of all recorded answers that were correct. A plain,
+ * understandable "how well am I doing" number. Returns null until there is data.
+ */
+export function getAccuracy(progress: UserProgress): number | null {
+  let correct = 0;
+  let total = 0;
+  for (const q of Object.values(progress.questions)) {
+    correct += q.correctCount ?? 0;
+    total += (q.correctCount ?? 0) + (q.wrongCount ?? 0);
+  }
+  if (total === 0) return null;
+  return Math.round((correct / total) * 100);
+}
+
+export interface Motivation {
+  emoji: string;
+  text: string;
+}
+
+/**
+ * Pick one short, encouraging line that reacts to the learner's current state —
+ * milestones first, then gentle nudges. Keeps motivation concrete and honest.
+ */
+export function getMotivation(input: {
+  streak: number;
+  todayCount: number;
+  dueTotal: number;
+  readiness: number; // best of the two exams
+  seen: number;
+}): Motivation {
+  const { streak, todayCount, dueTotal, readiness, seen } = input;
+
+  if (seen === 0) {
+    return { emoji: '⚓', text: 'Willkommen an Bord! Starte mit „Heute lernen" — schon 10 Fragen bringen dich voran.' };
+  }
+  if (readiness >= 85) {
+    return { emoji: '🎉', text: `Prüfungsreife ${readiness}% — du bist bereit! Teste dich an den Prüfungsbögen.` };
+  }
+  if (todayCount > 0 && dueTotal === 0) {
+    return { emoji: '✅', text: 'Heute alles Fällige gelernt — stark! Morgen halten dich ein paar Wiederholungen im Flow.' };
+  }
+  if (streak >= 7) {
+    return { emoji: '🔥', text: `${streak} Tage in Folge — beeindruckende Disziplin. Weiter so!` };
+  }
+  if (streak >= 3) {
+    return { emoji: '🔥', text: `${streak}-Tage-Streak! Dranbleiben zahlt sich aus — jeden Tag ein bisschen.` };
+  }
+  if (readiness >= 70) {
+    return { emoji: '💪', text: `Fast geschafft — ${readiness}% Prüfungsreife. Noch ein paar Sessions bis zum Ziel.` };
+  }
+  if (readiness >= 40) {
+    return { emoji: '📈', text: `Guter Fortschritt — ${readiness}% Prüfungsreife. Bleib am Ball!` };
+  }
+  return { emoji: '🧭', text: 'Kleine Häppchen, großer Effekt: ein paar Karten pro Tag führen dich sicher zur Prüfung.' };
+}

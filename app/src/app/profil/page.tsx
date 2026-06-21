@@ -44,7 +44,7 @@ function computeExamStats(
     const entry = progress.questions[key];
     if (!entry) continue;
     answeredQuestions++;
-    if (entry.correctCount >= CORRECT_THRESHOLD) passedQuestions++;
+    if ((entry.reps ?? entry.correctCount ?? 0) >= CORRECT_THRESHOLD) passedQuestions++;
     if (now - new Date(entry.lastAnswered).getTime() <= sinceMs) recentAnswers++;
   }
 
