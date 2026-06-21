@@ -8,9 +8,10 @@ import {
   isQuestionPassed,
   resetProgress,
 } from '@/lib/progress';
-import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
+import { seeTopics, getBinnenTopics, getBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ProgressSync } from '@/components/ui/ProgressSync';
+import { isBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
 import type { UserProgress, ExamType } from '@/lib/types';
 
@@ -246,7 +247,11 @@ export default function ProfilPage(): React.ReactElement {
 
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-  const binnenQuestions = getAllBinnenQuestions();
+  // Honour the "Binnen nur Zusatzfragen" setting so the profile matches the
+  // numbers shown on the home and exam pages.
+  const zusatz = isBinnenZusatzOnly();
+  const binnenQuestions = getBinnenQuestions(zusatz);
+  const binnenTopics = getBinnenTopics(zusatz);
   const seeQuestions = getAllSeeQuestions();
 
   const binnenStats = computeExamStats(progress, binnenQuestions, binnenTopics, 'binnen', SEVEN_DAYS_MS);

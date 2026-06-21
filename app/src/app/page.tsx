@@ -4,30 +4,20 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
-import { getQueueCounts } from '@/lib/srs';
-import { getStreak, getXp, getTodayCount, DAILY_GOAL } from '@/lib/gamification';
+import { getQueueCounts, getReadiness } from '@/lib/srs';
+import { getStreak, getXp, getTodayCount } from '@/lib/gamification';
 import { isBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
 import { getBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { CertificateCard } from '@/components/ui/CertificateCard';
 
-const tutorialLinks = [
-  { href: '/lernen/lichter-grundlagen', label: 'Lichterführung Grundlagen' },
-  { href: '/lernen/lichter-see', label: 'Lichter nach KVR' },
-  { href: '/lernen/ausweichregeln-kvr', label: 'Ausweichregeln KVR' },
-  { href: '/lernen/ausweichregeln-binnen', label: 'Ausweichregeln Binnen' },
-  { href: '/lernen/seezeichen', label: 'Seezeichen & Betonnung' },
-  { href: '/lernen/navigation-grundlagen', label: 'Navigation' },
-  { href: '/lernen/schallzeichen-see', label: 'Schallzeichen See' },
-  { href: '/lernen/schallzeichen-binnen', label: 'Schallzeichen Binnen' },
-  { href: '/lernen/sicherheit-ausruestung', label: 'Sicherheit & Ausrüstung' },
-  { href: '/lernen/knoten', label: 'Knoten & Tauwerk' },
-  { href: '/navigation', label: 'Navigationsrechner' },
-];
-
 interface ExamHomeStats {
-  binnenPct: number;
-  seePct: number;
+  binnenReady: number;
+  seeReady: number;
+  binnenMastered: number; // 3×-correct mastery — drives the certificate
+  seeMastered: number;
+  binnenSeen: number;
+  seeSeen: number;
   binnenDue: number;
   seeDue: number;
   streak: number;
@@ -36,8 +26,12 @@ interface ExamHomeStats {
 }
 
 const ZERO_STATS: ExamHomeStats = {
-  binnenPct: 0,
-  seePct: 0,
+  binnenReady: 0,
+  seeReady: 0,
+  binnenMastered: 0,
+  seeMastered: 0,
+  binnenSeen: 0,
+  seeSeen: 0,
   binnenDue: 0,
   seeDue: 0,
   streak: 0,
@@ -50,9 +44,15 @@ function useExamProgress(): ExamHomeStats {
     const progress = loadProgress();
     const binnen = getBinnenQuestions(isBinnenZusatzOnly());
     const see = getAllSeeQuestions();
+    const binnenReadiness = getReadiness(progress, 'binnen', binnen);
+    const seeReadiness = getReadiness(progress, 'see', see);
     return {
-      binnenPct: getExamOverallProgress(progress, binnen.map((q) => q.id), 'binnen').percentage,
-      seePct: getExamOverallProgress(progress, see.map((q) => q.id), 'see').percentage,
+      binnenReady: binnenReadiness.percentage,
+      seeReady: seeReadiness.percentage,
+      binnenMastered: getExamOverallProgress(progress, binnen.map((q) => q.id), 'binnen').percentage,
+      seeMastered: getExamOverallProgress(progress, see.map((q) => q.id), 'see').percentage,
+      binnenSeen: binnenReadiness.seen,
+      seeSeen: seeReadiness.seen,
       binnenDue: getQueueCounts(progress, 'binnen', binnen).total,
       seeDue: getQueueCounts(progress, 'see', see).total,
       streak: getStreak(progress),
@@ -67,15 +67,23 @@ export default function HomePage(): React.ReactElement {
   const mounted = useMounted();
   const raw = useExamProgress();
   // Until mounted, render neutral zeros so SSR and the first client render match.
-  const { binnenPct, seePct, binnenDue, seeDue, streak, xp, today } = mounted ? raw : ZERO_STATS;
-  const goalReached = today >= DAILY_GOAL;
+  const stats = mounted ? raw : ZERO_STATS;
+  const { binnenMastered, seeMastered, binnenDue, seeDue, streak, xp, today } = stats;
+
+  // One coherent "today": progress toward clearing the cards actually due today
+  // (answered today + still due), so the home goal == the learning queue.
+  const dueTotal = binnenDue + seeDue;
+  const todayTarget = today + dueTotal;
+  const todayPct = todayTarget > 0 ? Math.round((today / todayTarget) * 100) : 0;
+  const goalReached = today > 0 && dueTotal === 0;
 
   const examCards = [
     {
       title: 'SBF Binnen',
       sub: 'Binnenschifffahrtsstraßen',
       href: '/binnen',
-      pct: binnenPct,
+      ready: stats.binnenReady,
+      seen: stats.binnenSeen,
       due: binnenDue,
       color: 'gold' as const,
       icon: '🚢',
@@ -85,7 +93,8 @@ export default function HomePage(): React.ReactElement {
       title: 'SBF See',
       sub: 'Seeschifffahrtsstraßen',
       href: '/see',
-      pct: seePct,
+      ready: stats.seeReady,
+      seen: stats.seeSeen,
       due: seeDue,
       color: 'seafoam' as const,
       icon: '⛵',
@@ -98,7 +107,7 @@ export default function HomePage(): React.ReactElement {
       {/* Header */}
       <section className="px-4 pt-10 pb-10 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="max-w-3xl mx-auto">
-          {/* Gamification strip — streak, today's goal, XP */}
+          {/* Gamification strip — streak, today's queue goal, XP */}
           <div className="grid grid-cols-3 gap-3">
             <div
               className="rounded-xl px-3 py-3 text-center"
@@ -122,10 +131,10 @@ export default function HomePage(): React.ReactElement {
                 className="text-xl font-bold tabular-nums"
                 style={{ color: goalReached ? 'var(--green-signal)' : 'var(--white)' }}
               >
-                {goalReached ? '✓' : `${today}/${DAILY_GOAL}`}
+                {goalReached ? '✓' : dueTotal > 0 ? `${today}/${todayTarget}` : today}
               </div>
               <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                Heute
+                {dueTotal > 0 ? 'Heute fällig' : 'Heute gelernt'}
               </div>
             </div>
             <div
@@ -140,6 +149,12 @@ export default function HomePage(): React.ReactElement {
               </div>
             </div>
           </div>
+
+          {dueTotal > 0 && (
+            <div className="mt-3">
+              <ProgressBar value={todayPct} size="sm" color="seafoam" />
+            </div>
+          )}
         </div>
       </section>
 
@@ -147,7 +162,7 @@ export default function HomePage(): React.ReactElement {
         {/* Progress cards */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
-            Dein Fortschritt
+            Prüfungsreife
           </h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {examCards.map((card) => (
@@ -172,14 +187,19 @@ export default function HomePage(): React.ReactElement {
                     className="text-xs font-semibold tabular-nums px-2 py-0.5 rounded"
                     style={{
                       background: 'rgba(255,255,255,0.06)',
-                      color: card.pct > 0 ? 'var(--white)' : 'var(--muted)',
+                      color: card.seen > 0 ? 'var(--white)' : 'var(--muted)',
                     }}
                   >
-                    {card.pct}%
+                    {card.ready}%
                   </span>
                 </div>
 
-                <ProgressBar value={card.pct} size="sm" color={card.color} />
+                <div>
+                  <ProgressBar value={card.ready} size="sm" color={card.color} />
+                  <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
+                    Voraussichtliche Prüfungsreife
+                  </p>
+                </div>
 
                 {card.due > 0 ? (
                   <Link
@@ -197,7 +217,7 @@ export default function HomePage(): React.ReactElement {
                     href={card.href}
                     className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90"
                     style={
-                      card.pct > 0
+                      card.seen > 0
                         ? {
                             background: card.color === 'gold' ? 'rgba(188,147,50,0.12)' : 'rgba(77,201,176,0.12)',
                             color: card.color === 'gold' ? 'var(--gold-light)' : 'var(--seafoam-light)',
@@ -209,7 +229,7 @@ export default function HomePage(): React.ReactElement {
                           }
                     }
                   >
-                    {card.pct > 0 ? 'Weiterüben →' : 'Starten →'}
+                    {card.seen > 0 ? 'Weiterüben →' : 'Starten →'}
                   </Link>
                 )}
               </div>
@@ -217,15 +237,15 @@ export default function HomePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* Certificates */}
-        {(binnenPct === 100 || seePct === 100) && (
+        {/* Certificates — earned at full mastery (every question 3× correct) */}
+        {(binnenMastered === 100 || seeMastered === 100) && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--muted)' }}>
               Errungenschaften
             </h2>
             <div className="space-y-4">
-              {binnenPct === 100 && <CertificateCard exam="SBF Binnen" color="gold" />}
-              {seePct === 100 && <CertificateCard exam="SBF See" color="seafoam" />}
+              {binnenMastered === 100 && <CertificateCard exam="SBF Binnen" color="gold" />}
+              {seeMastered === 100 && <CertificateCard exam="SBF See" color="seafoam" />}
             </div>
           </section>
         )}
@@ -237,7 +257,7 @@ export default function HomePage(): React.ReactElement {
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: '/lernen', icon: '📖', label: 'Theorie' },
+              { href: '/lernen', icon: '📖', label: 'Theorie & Wissen' },
               { href: '/navigation', icon: '🧭', label: 'Navigation' },
             ].map((item) => (
               <Link
@@ -252,42 +272,6 @@ export default function HomePage(): React.ReactElement {
                 </span>
               </Link>
             ))}
-          </div>
-        </section>
-
-        {/* Tutorial links */}
-        <section>
-          <div className="rounded-xl p-6" style={{ background: 'var(--navy)', border: '1px solid var(--border)' }}>
-            <div className="flex items-baseline justify-between mb-5">
-              <div>
-                <h2 className="text-base font-semibold" style={{ color: 'var(--white)' }}>
-                  Theorie & Wissen
-                </h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                  Kurze Erklärungen zu den wichtigsten Themen
-                </p>
-              </div>
-              <Link
-                href="/lernen"
-                className="text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: 'var(--gold)' }}
-              >
-                Alle anzeigen →
-              </Link>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-1">
-              {tutorialLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm transition-colors hover:bg-white/5"
-                  style={{ color: 'var(--muted)' }}
-                >
-                  <span className="w-1 h-1 rounded-full shrink-0" style={{ background: 'var(--gold)', opacity: 0.7 }} />
-                  <span className="hover:text-white transition-colors">{link.label}</span>
-                </Link>
-              ))}
-            </div>
           </div>
         </section>
       </div>

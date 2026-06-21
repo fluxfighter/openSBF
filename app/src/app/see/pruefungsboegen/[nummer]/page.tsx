@@ -35,7 +35,9 @@ function buildEntries(questionIds: number[]): QuestionEntry[] {
   const allQuestions = getAllSeeQuestions();
   const questionMap = new Map(allQuestions.map((q) => [q.id, q]));
   const entries: QuestionEntry[] = [];
-  for (const id of questionIds) {
+  // Shuffle the question order too (not just the answers) so each attempt feels
+  // like a fresh exam, mirroring the real exam's randomised presentation.
+  for (const id of shuffleArray(questionIds)) {
     const q = questionMap.get(id);
     if (!q) continue;
     entries.push({

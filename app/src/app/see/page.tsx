@@ -6,20 +6,21 @@ import { seeTopics, getAllSeeQuestions } from '@/data/topics';
 
 const explanationItems = (
   <>
-    <li>Basisfragen (1–72) sind identisch mit SBF Binnen</li>
-    <li>Spezifische Fragen umfassen KVR, Seezeichen, Schallzeichen und Navigation</li>
+    <li>Basisfragen (1–72) sind identisch mit SBF Binnen; spezifisch sind KVR, Seezeichen, Schallzeichen und Navigation</li>
     <li>
-      Beantworte jede Frage{' '}
-      <span style={{ color: 'var(--white)' }}>3× richtig</span>, um sie zu bestehen — gehe dafür
-      alle Themengebiete durch
+      <span style={{ color: 'var(--white)' }}>Heute lernen</span> zeigt genau die fälligen Karten —
+      neue und zur Wiederholung im richtigen Abstand (Spaced Repetition)
     </li>
     <li>
-      Falsch beantwortete Fragen werden{' '}
-      <span style={{ color: 'var(--white)' }}>dauerhaft gezählt</span> — unter{' '}
-      <span style={{ color: 'var(--white)' }}>Problemfragen</span> findest du gezielte
-      Wiederholungen für deine häufigsten Fehler
+      Eine Frage gilt nach <span style={{ color: 'var(--white)' }}>3× richtig</span> als sicher
+      gelernt; falsch beantwortete tauchen früher wieder auf
     </li>
-    <li>Dein Fortschritt wird automatisch im Browser gespeichert</li>
+    <li>
+      Die <span style={{ color: 'var(--white)' }}>Prüfungsreife</span> schätzt, wie viel des Katalogs
+      du gerade sicher beherrschst; <span style={{ color: 'var(--white)' }}>Prüfungsbögen</span>{' '}
+      simulieren die echte Prüfung
+    </li>
+    <li>Dein Fortschritt wird automatisch auf deinen Geräten synchronisiert</li>
   </>
 );
 

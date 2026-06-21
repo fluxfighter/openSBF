@@ -5,20 +5,25 @@ import { binnenTopics, getAllBinnenQuestions } from '@/data/topics';
 
 const explanationItems = (
   <>
-    <li>Jede Frage hat 4 Antwortmöglichkeiten — nur eine ist richtig</li>
     <li>
-      Beantworte jede Frage{' '}
-      <span style={{ color: 'var(--white)' }}>3× richtig</span>, um sie zu bestehen — gehe dafür
-      alle Themengebiete durch
+      <span style={{ color: 'var(--white)' }}>Heute lernen</span> ist der schnellste Weg: es zeigt
+      genau die Karten, die heute fällig sind — neue und zur Wiederholung
     </li>
-    <li>Ein Thema gilt als bestanden, wenn alle enthaltenen Fragen bestanden sind</li>
     <li>
-      Falsch beantwortete Fragen werden{' '}
-      <span style={{ color: 'var(--white)' }}>dauerhaft gezählt</span> — unter{' '}
-      <span style={{ color: 'var(--white)' }}>Problemfragen</span> findest du gezielte
-      Wiederholungen für deine häufigsten Fehler
+      Karten kommen{' '}
+      <span style={{ color: 'var(--white)' }}>im richtigen Abstand wieder</span> (Spaced
+      Repetition) — eine Frage gilt nach 3× richtig als sicher gelernt
     </li>
-    <li>Dein Fortschritt wird automatisch im Browser gespeichert</li>
+    <li>
+      Falsch beantwortete Fragen tauchen{' '}
+      <span style={{ color: 'var(--white)' }}>früher erneut auf</span>; gehäufte Fehler sammeln sich
+      unter <span style={{ color: 'var(--white)' }}>Problemfragen</span>
+    </li>
+    <li>
+      Die <span style={{ color: 'var(--white)' }}>Prüfungsreife</span> schätzt, wie viel des Katalogs
+      du gerade sicher beherrschst
+    </li>
+    <li>Dein Fortschritt wird automatisch auf deinen Geräten synchronisiert</li>
   </>
 );
 

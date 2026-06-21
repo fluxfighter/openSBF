@@ -98,3 +98,12 @@ export interface ExamResult {
   specificTotal: number;
   passed: boolean;
 }
+
+export interface PruefungsbogenStats {
+  attempts: number;
+  avgCorrect: number; // average correct answers per attempt (out of 30)
+  passedCount: number; // how many attempts passed
+  bestCorrect: number;
+  lastCorrect: number | null;
+  lastPassed: boolean | null;
+}

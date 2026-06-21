@@ -64,8 +64,9 @@ h1, h2, h3 {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Focus mode (during a quiz session): hide the global nav for immersion. */
-html[data-focus-mode] nav {
+/* Focus mode (during a quiz session): hide global nav + footer for immersion. */
+html[data-focus-mode] nav,
+html[data-focus-mode] footer {
   display: none;
 }
 

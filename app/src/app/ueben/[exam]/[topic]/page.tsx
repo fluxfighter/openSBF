@@ -7,7 +7,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { Question, ExamType, AnswerKey, SessionStats } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { FeedbackModal } from '@/components/ui/FeedbackModal';
 import { getExamQuestions, getExamTopics } from '@/data/topics';
 import { isBinnenZusatzOnly } from '@/lib/settings';
 import {
@@ -525,24 +524,6 @@ export default function QuizPage(): React.ReactElement {
                 </button>
               );
             })}
-          </div>
-
-          <div className="mt-4 flex justify-end">
-            <FeedbackModal
-              context={{ questionId: String(currentQuestion.id), questionText: currentQuestion.text }}
-              trigger={
-                <button
-                  className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-opacity hover:opacity-80"
-                  style={{
-                    background: 'rgba(232,68,68,0.10)',
-                    border: '1px solid rgba(232,68,68,0.25)',
-                    color: 'var(--red-signal)',
-                  }}
-                >
-                  Fehler melden
-                </button>
-              }
-            />
           </div>
 
           {isRevealed && (

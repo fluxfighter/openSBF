@@ -1,4 +1,4 @@
-import type { UserProgress, QuestionProgress, ExamType, Question, ExamResult } from './types';
+import type { UserProgress, QuestionProgress, ExamType, Question, ExamResult, PruefungsbogenStats } from './types';
 import { applyGrade, gradeFromCorrect } from './srs';
 
 const STORAGE_KEY = 'opensbf_progress';
@@ -284,4 +284,25 @@ export function getBestExamResult(progress: UserProgress, nummer: number): ExamR
 export function getLastExamResult(progress: UserProgress, nummer: number): ExamResult | null {
   const results = getExamResults(progress, nummer);
   return results.length > 0 ? results[results.length - 1] : null;
+}
+
+/** Aggregate attempt statistics for one Prüfungsbogen (attempts, average, passes). */
+export function getPruefungsbogenStats(progress: UserProgress, nummer: number): PruefungsbogenStats {
+  const results = getExamResults(progress, nummer);
+  const attempts = results.length;
+  if (attempts === 0) {
+    return { attempts: 0, avgCorrect: 0, passedCount: 0, bestCorrect: 0, lastCorrect: null, lastPassed: null };
+  }
+  const sum = results.reduce((s, r) => s + r.correct, 0);
+  const passedCount = results.filter((r) => r.passed).length;
+  const bestCorrect = results.reduce((m, r) => Math.max(m, r.correct), 0);
+  const last = results[results.length - 1];
+  return {
+    attempts,
+    avgCorrect: Math.round((sum / attempts) * 10) / 10,
+    passedCount,
+    bestCorrect,
+    lastCorrect: last.correct,
+    lastPassed: last.passed,
+  };
 }
