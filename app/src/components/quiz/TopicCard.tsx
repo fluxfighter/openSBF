@@ -2,18 +2,20 @@
 
 import Link from 'next/link';
 import type { Topic } from '@/lib/types';
-import { ProgressBar } from '@/components/ui/ProgressBar';
 
 interface TopicCardProps {
   topic: Topic;
   passed: number;
+  learning: number;
   total: number;
   percentage: number;
+  learningPct: number;
   isPassed: boolean;
   exam: 'binnen' | 'see';
 }
 
-export function TopicCard({ topic, passed, total, percentage, isPassed, exam }: TopicCardProps) {
+export function TopicCard({ topic, passed, learning, total, percentage, learningPct, isPassed, exam }: TopicCardProps): React.ReactElement {
+  const seen = passed + learning;
   return (
     <Link
       href={`/ueben/${exam}/${topic.id}`}
@@ -45,11 +47,46 @@ export function TopicCard({ topic, passed, total, percentage, isPassed, exam }: 
         )}
       </div>
 
-      <ProgressBar value={percentage} size="sm" color={isPassed ? 'green' : 'gold'} className="mb-2" />
+      {/* Segmented progress bar: green = gelernt, gold/seafoam = lernend */}
+      <div
+        className="h-1.5 rounded-full overflow-hidden mb-2"
+        style={{ background: 'rgba(255,255,255,0.07)' }}
+      >
+        <div className="h-full flex">
+          {percentage > 0 && (
+            <div
+              className="h-full transition-all duration-500"
+              style={{ width: `${percentage}%`, background: 'var(--green-signal)' }}
+            />
+          )}
+          {learningPct > 0 && (
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${learningPct}%`,
+                background: exam === 'see' ? 'var(--seafoam)' : 'var(--gold)',
+                opacity: 0.7,
+              }}
+            />
+          )}
+        </div>
+      </div>
 
       <div className="flex items-center justify-between">
         <span className="text-xs" style={{ color: 'var(--muted)' }}>
-          {passed} / {total} Fragen
+          {seen > 0 ? (
+            <>
+              <span style={{ color: 'var(--green-signal)' }}>{passed}</span>
+              {learning > 0 && (
+                <span style={{ color: exam === 'see' ? 'var(--seafoam)' : 'var(--gold)' }}>
+                  {' '}+{learning}
+                </span>
+              )}
+              <span> / {total}</span>
+            </>
+          ) : (
+            `0 / ${total} Fragen`
+          )}
         </span>
         <span
           className="text-xs font-medium tabular-nums"

@@ -240,10 +240,22 @@ export function getTopicProgress(
   progress: UserProgress,
   questionIds: number[],
   exam: ExamType,
-): { passed: number; total: number; percentage: number } {
+): { passed: number; learning: number; total: number; percentage: number; learningPct: number } {
   const total = questionIds.length;
-  const passed = questionIds.filter((id) => isQuestionPassed(progress, id, exam)).length;
-  return { passed, total, percentage: total > 0 ? Math.round((passed / total) * 100) : 0 };
+  let passed = 0;
+  let learning = 0;
+  for (const id of questionIds) {
+    const streak = getQuestionStreak(progress, id, exam);
+    if (streak >= CORRECT_THRESHOLD) passed++;
+    else if (streak >= 1) learning++;
+  }
+  return {
+    passed,
+    learning,
+    total,
+    percentage: total > 0 ? Math.round((passed / total) * 100) : 0,
+    learningPct: total > 0 ? Math.round((learning / total) * 100) : 0,
+  };
 }
 
 export function isTopicPassed(

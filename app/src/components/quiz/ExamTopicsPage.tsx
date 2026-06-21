@@ -7,7 +7,6 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import {
   loadProgress,
   getTopicProgress,
-  isTopicPassed,
   getExamOverallProgress,
   getHardestQuestions,
   getBookmarkCount,
@@ -52,7 +51,7 @@ function computeExamProgress(
 
   topics.forEach((topic) => {
     const tp = getTopicProgress(progress, topic.questionIds, exam);
-    progressData[topic.id] = { ...tp, isPassed: isTopicPassed(progress, topic.questionIds, exam) };
+    progressData[topic.id] = { ...tp, isPassed: tp.passed === tp.total && tp.total > 0 };
   });
 
   const hardCount = getHardestQuestions(progress, exam, allQuestions).length;
@@ -329,14 +328,16 @@ export function ExamTopicsPage({
           {effectiveTopics
             .filter((t) => (progressData[t.id]?.total ?? 0) > 0)
             .map((topic) => {
-              const pd = progressData[topic.id] ?? { passed: 0, total: 0, percentage: 0, isPassed: false };
+              const pd = progressData[topic.id] ?? { passed: 0, learning: 0, total: 0, percentage: 0, learningPct: 0, isPassed: false };
               return (
                 <TopicCard
                   key={topic.id}
                   topic={topic}
                   passed={pd.passed}
+                  learning={pd.learning}
                   total={pd.total}
                   percentage={pd.percentage}
+                  learningPct={pd.learningPct}
                   isPassed={pd.isPassed}
                   exam={exam}
                 />

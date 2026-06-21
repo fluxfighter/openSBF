@@ -80,8 +80,10 @@ export interface SessionStats {
 
 export interface TopicProgressEntry {
   passed: number;
+  learning: number;
   total: number;
   percentage: number;
+  learningPct: number;
   isPassed: boolean;
 }
 
