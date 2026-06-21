@@ -37,6 +37,23 @@ const SYNC_ENDPOINT = '/api/state';
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingPush: UserProgress | null = null;
 
+function flushPendingPush(): void {
+  if (!pendingPush) return;
+  const payload = pendingPush;
+  pendingPush = null;
+  if (pushTimer) {
+    clearTimeout(pushTimer);
+    pushTimer = null;
+  }
+  // keepalive: true lets the request outlive the page (PWA background, tab close, navigation).
+  void fetch(SYNC_ENDPOINT, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 function schedulePush(progress: UserProgress): void {
   if (typeof window === 'undefined') return;
   pendingPush = progress;
@@ -54,6 +71,17 @@ function schedulePush(progress: UserProgress): void {
       // offline / server unavailable — local cache already holds the data
     });
   }, 800);
+}
+
+// Flush any pending push when the page is hidden or unloaded. This covers:
+// – iOS PWA moving to background (visibilitychange → hidden)
+// – Tab close / browser quit (pagehide)
+// – Next.js SPA navigation is handled by the 800ms timer surviving in the module scope.
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushPendingPush();
+  });
+  window.addEventListener('pagehide', flushPendingPush);
 }
 
 /**
