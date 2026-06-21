@@ -36,6 +36,41 @@ const HARD_QUESTIONS_TOPIC_ID = 'schwierige-fragen';
 const DAILY_QUEUE_TOPIC_ID = 'heute';
 const BOOKMARKED_TOPIC_ID = 'gemerkte-fragen';
 
+// ---------------------------------------------------------------------------
+// Daily session persistence — saves the queue order for the current day so
+// that pressing X and coming back resumes rather than reshuffles.
+// ---------------------------------------------------------------------------
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadSessionQueue(exam: ExamType): number[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(`opensbf_session_${exam}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { date: string; queueIds: number[] };
+    if (parsed.date !== todayStr()) return null;
+    return parsed.queueIds;
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionQueue(exam: ExamType, questions: Question[]): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(
+    `opensbf_session_${exam}`,
+    JSON.stringify({ date: todayStr(), queueIds: questions.map((q) => q.id) }),
+  );
+}
+
+function clearSessionQueue(exam: ExamType): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(`opensbf_session_${exam}`);
+}
+
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -107,7 +142,21 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
 
   let questions: Question[];
   if (topicId === DAILY_QUEUE_TOPIC_ID) {
-    questions = buildDailyQueue(progress, exam, allQuestions);
+    const fresh = buildDailyQueue(progress, exam, allQuestions);
+    const savedIds = loadSessionQueue(exam);
+    if (savedIds && savedIds.length > 0) {
+      // Restore the saved order; keep only questions still in today's queue.
+      const stillDueIds = new Set(fresh.map((q) => q.id));
+      const idToQ = new Map(allQuestions.map((q) => [q.id, q]));
+      const restored = savedIds
+        .filter((id) => stillDueIds.has(id))
+        .map((id) => idToQ.get(id))
+        .filter((q): q is Question => q !== undefined);
+      questions = restored.length > 0 ? restored : fresh;
+    } else {
+      questions = fresh;
+      saveSessionQueue(exam, fresh);
+    }
   } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
   } else if (topicId === BOOKMARKED_TOPIC_ID) {
@@ -245,6 +294,7 @@ export default function QuizPage(): React.ReactElement {
         // in new ones, so the session keeps going until today's queue is clear.
         const stillDue = buildDailyQueue(progress, exam, allQuestions, { includeNew: false });
         if (stillDue.length === 0) {
+          clearSessionQueue(exam);
           setIsComplete(true);
           return;
         }
