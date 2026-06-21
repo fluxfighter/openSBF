@@ -21,6 +21,7 @@ export async function readState(): Promise<UserProgress | null> {
     const parsed: unknown = JSON.parse(raw);
     if (!isUserProgress(parsed)) return null;
     if (!parsed.pruefungsboegen) parsed.pruefungsboegen = {};
+    if (!parsed.bookmarks) parsed.bookmarks = {};
     return parsed;
   } catch {
     // Missing file or invalid JSON → treat as "no state yet".
