@@ -13,7 +13,7 @@ function isUserProgress(value: unknown): value is UserProgress {
 }
 
 function emptyProgress(): UserProgress {
-  return { questions: {}, topics: {}, pruefungsboegen: {}, lastUpdated: new Date().toISOString() };
+  return { questions: {}, topics: {}, pruefungsboegen: {}, bookmarks: {}, lastUpdated: new Date().toISOString() };
 }
 
 export async function GET(): Promise<NextResponse> {

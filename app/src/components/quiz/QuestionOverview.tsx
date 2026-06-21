@@ -2,8 +2,18 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { loadProgress, getQuestionStreak, getQuestionWrongCount, getQuestionKey } from '@/lib/progress';
+import {
+  loadProgress,
+  saveProgress,
+  getQuestionStreak,
+  getQuestionWrongCount,
+  getQuestionKey,
+  isBookmarked,
+  toggleBookmark,
+} from '@/lib/progress';
 import { isDue } from '@/lib/srs';
+import { BookmarkIcon } from '@heroicons/react/24/outline';
+import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import { getExamQuestions, getExamTopics } from '@/data/topics';
 import { tutorialForTopic } from '@/data/tutorials';
 import { isBinnenZusatzOnly } from '@/lib/settings';
@@ -11,7 +21,7 @@ import { useMounted } from '@/hooks/useMounted';
 import type { AccentColor, ExamType, Question, UserProgress } from '@/lib/types';
 
 type Status = 'neu' | 'lernend' | 'gelernt';
-type Filter = 'alle' | Status | 'schwierig';
+type Filter = 'alle' | Status | 'schwierig' | 'gemerkt';
 
 interface StatusInfo {
   status: Status;
@@ -46,9 +56,11 @@ interface QuestionRowProps {
   info: StatusInfo;
   exam: ExamType;
   accentVar: string;
+  bookmarked: boolean;
+  onToggleBookmark: (id: number) => void;
 }
 
-function QuestionRow({ question, info, exam, accentVar }: QuestionRowProps): React.ReactElement {
+function QuestionRow({ question, info, exam, accentVar, bookmarked, onToggleBookmark }: QuestionRowProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const tutorialId = tutorialForTopic(question.topic, exam);
 
@@ -84,6 +96,9 @@ function QuestionRow({ question, info, exam, accentVar }: QuestionRowProps): Rea
         </span>
         {info.hard && (
           <span className="shrink-0 text-xs" style={{ color: 'var(--red-signal)' }}>schwierig</span>
+        )}
+        {bookmarked && (
+          <BookmarkSolidIcon className="shrink-0 h-3.5 w-3.5" style={{ color: 'var(--gold)' }} />
         )}
         <span
           className="shrink-0 text-xs px-2 py-0.5 rounded-full"
@@ -123,6 +138,14 @@ function QuestionRow({ question, info, exam, accentVar }: QuestionRowProps): Rea
             </p>
           )}
           <div className="mt-3 flex items-center gap-4">
+            <button
+              onClick={() => onToggleBookmark(question.id)}
+              className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+              style={{ color: bookmarked ? 'var(--gold)' : 'var(--muted)' }}
+            >
+              {bookmarked ? <BookmarkSolidIcon className="h-3.5 w-3.5" /> : <BookmarkIcon className="h-3.5 w-3.5" />}
+              {bookmarked ? 'Gemerkt' : 'Merken'}
+            </button>
             <Link
               href={`/ueben/${exam}/${question.topic}`}
               className="text-xs font-medium transition-opacity hover:opacity-80"
@@ -156,15 +179,26 @@ export function QuestionOverview({ exam, title, accentColor }: QuestionOverviewP
   const mounted = useMounted();
   const [filter, setFilter] = useState<Filter>('alle');
   const [topic, setTopic] = useState<string>('alle');
+  const [, setRefresh] = useState(0);
 
   const accentVar = accentColor === 'gold' ? 'var(--gold)' : 'var(--seafoam)';
   const zusatz = exam === 'binnen' && isBinnenZusatzOnly();
   const topics = getExamTopics(exam, zusatz);
 
-  // Computed each render; the React Compiler memoizes automatically.
+  const handleToggleBookmark = (id: number): void => {
+    saveProgress(toggleBookmark(loadProgress(), id, exam));
+    setRefresh((r) => r + 1);
+  };
+
+  // Computed each render; setRefresh() forces a re-read after a bookmark toggle.
+  // The React Compiler memoizes automatically.
   const progress = mounted ? loadProgress() : null;
   const all = progress
-    ? getExamQuestions(exam, zusatz).map((q) => ({ question: q, info: questionStatus(progress, q, exam) }))
+    ? getExamQuestions(exam, zusatz).map((q) => ({
+        question: q,
+        info: questionStatus(progress, q, exam),
+        bookmarked: isBookmarked(progress, q.id, exam),
+      }))
     : [];
   const counts = {
     alle: all.length,
@@ -172,11 +206,13 @@ export function QuestionOverview({ exam, title, accentColor }: QuestionOverviewP
     lernend: all.filter((r) => r.info.status === 'lernend').length,
     gelernt: all.filter((r) => r.info.status === 'gelernt').length,
     schwierig: all.filter((r) => r.info.hard).length,
+    gemerkt: all.filter((r) => r.bookmarked).length,
   };
   const rows = all.filter((r) => {
     if (topic !== 'alle' && r.question.topic !== topic) return false;
     if (filter === 'alle') return true;
     if (filter === 'schwierig') return r.info.hard;
+    if (filter === 'gemerkt') return r.bookmarked;
     return r.info.status === filter;
   });
 
@@ -186,6 +222,7 @@ export function QuestionOverview({ exam, title, accentColor }: QuestionOverviewP
     { key: 'lernend', label: 'Lernend', count: counts.lernend },
     { key: 'gelernt', label: 'Gelernt', count: counts.gelernt },
     { key: 'schwierig', label: 'Schwierig', count: counts.schwierig },
+    { key: 'gemerkt', label: 'Gemerkt', count: counts.gemerkt },
   ];
 
   return (
@@ -256,6 +293,8 @@ export function QuestionOverview({ exam, title, accentColor }: QuestionOverviewP
                 info={r.info}
                 exam={exam}
                 accentVar={accentVar}
+                bookmarked={r.bookmarked}
+                onToggleBookmark={handleToggleBookmark}
               />
             ))}
           </div>

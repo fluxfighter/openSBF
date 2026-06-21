@@ -10,12 +10,15 @@ import {
   isTopicPassed,
   getExamOverallProgress,
   getHardestQuestions,
+  getBookmarkCount,
 } from '@/lib/progress';
 import { getQueueCounts, getReadiness, type QueueCounts } from '@/lib/srs';
 import { getBinnenTopics, getBinnenQuestions } from '@/data/topics';
 import { isBinnenZusatzOnly, setBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
 import type { ExamType, Topic, Question, AccentColor, TopicProgressEntry } from '@/lib/types';
+
+const BOOKMARKED_TOPIC_ID = 'gemerkte-fragen';
 
 interface ExamTopicsPageProps {
   exam: ExamType;
@@ -32,6 +35,7 @@ interface ExamProgressSnapshot {
   overall: { passed: number; total: number; percentage: number };
   progressData: Record<string, TopicProgressEntry>;
   hardCount: number;
+  bookmarkCount: number;
   queue: QueueCounts;
   readiness: number;
 }
@@ -56,6 +60,7 @@ function computeExamProgress(
     overall: getExamOverallProgress(progress, allIds, exam),
     progressData,
     hardCount,
+    bookmarkCount: getBookmarkCount(progress, exam, allIds),
     queue: getQueueCounts(progress, exam, allQuestions),
     readiness: getReadiness(progress, exam, allQuestions).percentage,
   };
@@ -74,7 +79,7 @@ export function ExamTopicsPage({
   const mounted = useMounted();
   const [zusatz, setZusatz] = useState<boolean>(() => exam === 'binnen' && isBinnenZusatzOnly());
 
-  const { overall, progressData, hardCount, queue, readiness, effectiveTopics } = useMemo(() => {
+  const { overall, progressData, hardCount, bookmarkCount, queue, readiness, effectiveTopics } = useMemo(() => {
     const t = exam === 'binnen' ? getBinnenTopics(zusatz) : topics;
     const getQs: () => Question[] = exam === 'binnen' ? () => getBinnenQuestions(zusatz) : getAllQuestions;
     return { ...computeExamProgress(exam, t, getQs), effectiveTopics: t };
@@ -279,6 +284,37 @@ export function ExamTopicsPage({
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
                     {hardCount} {hardCount === 1 ? 'Frage' : 'Fragen'} häufig falsch beantwortet
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>→</span>
+            </Link>
+          </div>
+        )}
+
+        {bookmarkCount > 0 && (
+          <div className="mb-6">
+            <Link
+              href={`/ueben/${exam}/${BOOKMARKED_TOPIC_ID}`}
+              className="flex items-center justify-between p-4 rounded-xl transition-opacity hover:opacity-80"
+              style={{
+                background: 'rgba(188, 147, 50, 0.07)',
+                border: '1px solid rgba(188, 147, 50, 0.22)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-base shrink-0"
+                  style={{ background: 'rgba(188, 147, 50, 0.12)', color: 'var(--gold)' }}
+                >
+                  🔖
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: 'var(--white)' }}>
+                    Gemerkte Fragen üben
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                    {bookmarkCount} {bookmarkCount === 1 ? 'Frage' : 'Fragen'} vorgemerkt
                   </p>
                 </div>
               </div>

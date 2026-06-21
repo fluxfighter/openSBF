@@ -5,7 +5,7 @@ const STORAGE_KEY = 'opensbf_progress';
 const CORRECT_THRESHOLD = 3;
 
 function emptyProgress(): UserProgress {
-  return { questions: {}, topics: {}, pruefungsboegen: {}, lastUpdated: new Date().toISOString() };
+  return { questions: {}, topics: {}, pruefungsboegen: {}, bookmarks: {}, lastUpdated: new Date().toISOString() };
 }
 
 export function loadProgress(): UserProgress {
@@ -13,8 +13,9 @@ export function loadProgress(): UserProgress {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return emptyProgress();
   const parsed = JSON.parse(raw) as UserProgress;
-  // backfill for older stored data that predates the pruefungsboegen field
+  // backfill for older stored data that predates these fields
   if (!parsed.pruefungsboegen) parsed.pruefungsboegen = {};
+  if (!parsed.bookmarks) parsed.bookmarks = {};
   return parsed;
 }
 
@@ -110,6 +111,7 @@ export function recordAnswer(
     intervalDays: srs.intervalDays,
     due: srs.due,
     reps: srs.reps,
+    bestReps: Math.max(existing?.bestReps ?? 0, srs.reps),
     lapses: srs.lapses,
   };
 
@@ -135,6 +137,15 @@ export function getQuestionStreak(progress: UserProgress, questionId: number, ex
   return e.reps ?? e.correctCount ?? 0;
 }
 
+/** Highest consecutive-correct streak ever reached — the "ghost" max shown behind the current streak. */
+export function getQuestionBestStreak(progress: UserProgress, questionId: number, exam: ExamType): number {
+  const e = progress.questions[getQuestionKey(questionId, exam)];
+  if (!e) return 0;
+  // Legacy fallback: entries without reps/bestReps but past the threshold count as fully mastered.
+  const legacy = (e.correctCount ?? 0) >= CORRECT_THRESHOLD ? CORRECT_THRESHOLD : 0;
+  return Math.max(e.bestReps ?? 0, e.reps ?? 0, legacy);
+}
+
 export function isQuestionPassed(progress: UserProgress, questionId: number, exam: ExamType): boolean {
   return getQuestionStreak(progress, questionId, exam) >= CORRECT_THRESHOLD;
 }
@@ -147,6 +158,38 @@ export function getQuestionCorrectCount(progress: UserProgress, questionId: numb
 export function getQuestionWrongCount(progress: UserProgress, questionId: number, exam: ExamType): number {
   const key = getQuestionKey(questionId, exam);
   return progress.questions[key]?.wrongCount ?? 0;
+}
+
+// ---------------------------------------------------------------------------
+// Bookmarks ("gemerkte Fragen")
+// ---------------------------------------------------------------------------
+
+export function isBookmarked(progress: UserProgress, questionId: number, exam: ExamType): boolean {
+  return progress.bookmarks?.[getQuestionKey(questionId, exam)] === true;
+}
+
+/** Pure toggle — returns new progress with the bookmark flipped. */
+export function toggleBookmark(progress: UserProgress, questionId: number, exam: ExamType): UserProgress {
+  const key = getQuestionKey(questionId, exam);
+  const bookmarks = { ...(progress.bookmarks ?? {}) };
+  if (bookmarks[key]) delete bookmarks[key];
+  else bookmarks[key] = true;
+  return { ...progress, bookmarks, lastUpdated: new Date().toISOString() };
+}
+
+export function getBookmarkCount(progress: UserProgress, exam: ExamType, ids?: number[]): number {
+  const set = progress.bookmarks ?? {};
+  if (ids) return ids.filter((id) => set[getQuestionKey(id, exam)] === true).length;
+  const prefix = `${exam}_`;
+  return Object.entries(set).filter(([k, v]) => v === true && k.startsWith(prefix)).length;
+}
+
+export function getBookmarkedQuestions(
+  progress: UserProgress,
+  exam: ExamType,
+  allQuestions: Question[],
+): Question[] {
+  return allQuestions.filter((q) => isBookmarked(progress, q.id, exam));
 }
 
 export const HARD_QUESTIONS_LIMIT = 20;
@@ -207,6 +250,7 @@ export function mergeProgress(current: UserProgress, imported: UserProgress): Us
       ...fresher,
       correctCount: Math.max(importedQ.correctCount, existing?.correctCount ?? 0),
       wrongCount: Math.max(importedQ.wrongCount ?? 0, existing?.wrongCount ?? 0),
+      bestReps: Math.max(importedQ.bestReps ?? 0, existing?.bestReps ?? 0, fresher.reps ?? 0),
     };
   }
 
@@ -221,10 +265,17 @@ export function mergeProgress(current: UserProgress, imported: UserProgress): Us
     );
   }
 
+  // Bookmarks: union — a question stays bookmarked if either side has it.
+  const mergedBookmarks: UserProgress['bookmarks'] = { ...(current.bookmarks ?? {}) };
+  for (const [key, on] of Object.entries(imported.bookmarks ?? {})) {
+    if (on) mergedBookmarks[key] = true;
+  }
+
   return {
     questions: merged,
     topics: {},
     pruefungsboegen: mergedPb,
+    bookmarks: mergedBookmarks,
     lastUpdated: new Date().toISOString(),
   };
 }

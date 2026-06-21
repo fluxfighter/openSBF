@@ -43,7 +43,8 @@ export interface QuestionProgress {
   ease?: number; // ease factor, >= 1.3
   intervalDays?: number; // current review interval in days
   due?: string; // ISO timestamp of next review
-  reps?: number; // consecutive successful reviews
+  reps?: number; // consecutive successful reviews (resets to 0 on a wrong answer)
+  bestReps?: number; // highest reps streak ever reached (for the regression "ghost")
   lapses?: number; // number of times the card was forgotten
 }
 
@@ -59,6 +60,8 @@ export interface UserProgress {
   questions: Record<string, QuestionProgress>;
   topics: Record<string, TopicProgress>;
   pruefungsboegen: Record<string, ExamResult[]>;
+  // Bookmarked ("gemerkte") questions, keyed by `${exam}_${id}`.
+  bookmarks: Record<string, boolean>;
   lastUpdated: string;
 }
 

@@ -16,19 +16,25 @@ import {
   recordAnswer,
   isQuestionPassed,
   getQuestionStreak,
+  getQuestionBestStreak,
   getQuestionWrongCount,
   getHardestQuestions,
+  getBookmarkedQuestions,
+  isBookmarked,
+  toggleBookmark,
   isTopicPassed,
 } from '@/lib/progress';
 import { buildDailyQueue } from '@/lib/srs';
 import { playCorrect, playFinish, isSoundEnabled, setSoundEnabled } from '@/lib/sound';
 import { useMounted } from '@/hooks/useMounted';
-import { SpeakerWaveIcon, SpeakerXMarkIcon } from '@heroicons/react/24/outline';
+import { SpeakerWaveIcon, SpeakerXMarkIcon, BookmarkIcon } from '@heroicons/react/24/outline';
+import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import type { UserProgress } from '@/lib/types';
 
 const CORRECT_THRESHOLD = 3;
 const HARD_QUESTIONS_TOPIC_ID = 'schwierige-fragen';
 const DAILY_QUEUE_TOPIC_ID = 'heute';
+const BOOKMARKED_TOPIC_ID = 'gemerkte-fragen';
 
 function shuffleArray<T>(arr: T[]): T[] {
   const shuffled = [...arr];
@@ -49,11 +55,16 @@ function getTopicQuestions(topicId: string, exam: ExamType, zusatz: boolean): Qu
 function getTopicName(topicId: string, exam: ExamType): string {
   if (topicId === HARD_QUESTIONS_TOPIC_ID) return 'Deine Problemfragen';
   if (topicId === DAILY_QUEUE_TOPIC_ID) return 'Heute lernen';
+  if (topicId === BOOKMARKED_TOPIC_ID) return 'Gemerkte Fragen';
   return getExamTopics(exam, false).find((t) => t.id === topicId)?.name ?? topicId;
 }
 
 function isQueueMode(topicId: string): boolean {
-  return topicId === HARD_QUESTIONS_TOPIC_ID || topicId === DAILY_QUEUE_TOPIC_ID;
+  return (
+    topicId === HARD_QUESTIONS_TOPIC_ID ||
+    topicId === DAILY_QUEUE_TOPIC_ID ||
+    topicId === BOOKMARKED_TOPIC_ID
+  );
 }
 
 type ShuffledOption = { key: AnswerKey; text: string; originalKey: AnswerKey };
@@ -99,6 +110,8 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
     questions = buildDailyQueue(progress, exam, allQuestions);
   } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
+  } else if (topicId === BOOKMARKED_TOPIC_ID) {
+    questions = shuffleArray(getBookmarkedQuestions(progress, exam, allQuestions));
   } else {
     const topicQuestions = getTopicQuestions(topicId, exam, zusatz);
     const unpassed = topicQuestions.filter((q) => !isQuestionPassed(progress, q.id, exam));
@@ -151,6 +164,16 @@ export default function QuizPage(): React.ReactElement {
       return !on;
     });
   }, []);
+
+  const toggleCurrentBookmark = useCallback((): void => {
+    setQuiz((prev) => {
+      const q = prev.questions[prev.currentIdx];
+      if (!q) return prev;
+      const np = toggleBookmark(prev.progress, q.id, exam);
+      saveProgress(np);
+      return { ...prev, progress: np };
+    });
+  }, [exam]);
 
   const handleSelect = useCallback(
     (key: AnswerKey): void => {
@@ -228,7 +251,7 @@ export default function QuizPage(): React.ReactElement {
         setQuiz((prev) => ({ ...prev, questions: stillDue, currentIdx: 0, view: makeView(stillDue[0]), answered: {} }));
         return;
       }
-      if (topicId === HARD_QUESTIONS_TOPIC_ID) {
+      if (topicId === HARD_QUESTIONS_TOPIC_ID || topicId === BOOKMARKED_TOPIC_ID) {
         setIsComplete(true);
         return;
       }
@@ -312,11 +335,17 @@ export default function QuizPage(): React.ReactElement {
   if (questions.length === 0) {
     const queueEmpty = isQueueMode(topicId);
     const emptyTitle =
-      topicId === DAILY_QUEUE_TOPIC_ID ? 'Für heute geschafft' : 'Keine Problemfragen';
+      topicId === DAILY_QUEUE_TOPIC_ID
+        ? 'Für heute geschafft'
+        : topicId === BOOKMARKED_TOPIC_ID
+          ? 'Keine gemerkten Fragen'
+          : 'Keine Problemfragen';
     const emptyText =
       topicId === DAILY_QUEUE_TOPIC_ID
         ? 'Es sind keine Karten fällig. Komm morgen wieder oder lerne ein Thema gezielt.'
-        : 'Du hast noch keine Frage falsch beantwortet — weiter so!';
+        : topicId === BOOKMARKED_TOPIC_ID
+          ? 'Tippe beim Üben auf das Lesezeichen, um dir knifflige Fragen zu merken.'
+          : 'Du hast noch keine Frage falsch beantwortet — weiter so!';
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--navy-deep)' }}>
         <div className="text-center max-w-xs">
@@ -369,7 +398,9 @@ export default function QuizPage(): React.ReactElement {
 
   const currentQuestion = questions[currentIdx];
   const masteryStreak = getQuestionStreak(progress, currentQuestion.id, exam);
+  const bestStreak = getQuestionBestStreak(progress, currentQuestion.id, exam);
   const wrongCount = getQuestionWrongCount(progress, currentQuestion.id, exam);
+  const bookmarked = isBookmarked(progress, currentQuestion.id, exam);
   const isAnswerCorrect = isRevealed && selectedAnswer === currentQuestion.correctAnswer;
   const tutorialId = tutorialForTopic(currentQuestion.topic, exam);
   // Session progress through the deck — fills as you answer (Duolingo-style).
@@ -395,6 +426,15 @@ export default function QuizPage(): React.ReactElement {
               style={{ width: `${sessionPct}%`, background: barColor }}
             />
           </div>
+          <button
+            onClick={toggleCurrentBookmark}
+            aria-label={bookmarked ? 'Merken aufheben' : 'Frage merken'}
+            aria-pressed={bookmarked}
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-white/5"
+            style={{ color: bookmarked ? 'var(--gold)' : 'var(--muted)' }}
+          >
+            {bookmarked ? <BookmarkSolidIcon className="h-4 w-4" /> : <BookmarkIcon className="h-4 w-4" />}
+          </button>
           <button
             onClick={toggleSound}
             aria-label={soundOn ? 'Ton aus' : 'Ton an'}
@@ -444,16 +484,31 @@ export default function QuizPage(): React.ReactElement {
                 {currentIdx + 1}/{questions.length}
               </span>
               <div className="flex gap-1">
-                {Array.from({ length: CORRECT_THRESHOLD }).map((_, i) => (
+                {Array.from({ length: CORRECT_THRESHOLD }).map((_, i) => {
+                  // Green = current streak; gray "ghost" = best ever reached
+                  // beyond the current streak (shows regression after forgetting).
+                  const isCurrent = i < masteryStreak;
+                  const isGhost = !isCurrent && i < bestStreak;
+                  return (
                   <div
                     key={i}
                     className="w-2 h-2 rounded-full border transition-all"
+                    title={isCurrent ? 'Aktuelle Serie' : isGhost ? 'Schon mal erreicht' : undefined}
                     style={{
-                      background: i < masteryStreak ? 'var(--green-signal)' : 'transparent',
-                      borderColor: i < masteryStreak ? 'var(--green-signal)' : 'rgba(255,255,255,0.15)',
+                      background: isCurrent
+                        ? 'var(--green-signal)'
+                        : isGhost
+                          ? 'rgba(255,255,255,0.30)'
+                          : 'transparent',
+                      borderColor: isCurrent
+                        ? 'var(--green-signal)'
+                        : isGhost
+                          ? 'rgba(255,255,255,0.30)'
+                          : 'rgba(255,255,255,0.15)',
                     }}
                   />
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
