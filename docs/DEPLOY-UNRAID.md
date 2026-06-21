@@ -31,10 +31,9 @@ Am einfachsten für einen Heim-Single-User: Repo auf Unraid holen und mit
 mkdir -p /mnt/user/appdata/opensbf
 cd /mnt/user/appdata
 
-# 2) Repo holen (Branch mit dem aktuellen Stand)
+# 2) Repo holen (main enthält den aktuellen Stand)
 git clone https://github.com/fluxfighter/openSBF.git opensbf-src
 cd opensbf-src
-git checkout learning-focus      # bis es in main gemerged ist
 
 # 3) Bauen & starten (erster Build dauert ein paar Minuten)
 docker compose up -d --build
@@ -48,6 +47,25 @@ Aufruf danach: `http://<UNRAID-IP>:3000`
 
 > Port belegt? In `docker-compose.yml` die **linke** Zahl bei `ports:` ändern
 > (z. B. `"3080:3000"`) und `docker compose up -d` erneut ausführen.
+
+### Variante: eigene IP für den Container (macvlan auf bond0)
+Wenn der Container eine **eigene IP** im LAN bekommen soll (z. B. über das
+Unraid-Netz `br0`/`bond0`), entfällt das Host-Port-Mapping — der Container lauscht
+einfach auf `:3000` seiner eigenen IP. Dazu in `docker-compose.yml` das
+`ports:`-Mapping weglassen und stattdessen das vorhandene Unraid-Netz mit fester
+IP nutzen, z. B.:
+```yaml
+    networks:
+      lan:
+        ipv4_address: 192.168.x.y      # freie IP in deinem Subnetz
+networks:
+  lan:
+    external: true
+    name: br0                          # exakter Name via: docker network ls
+```
+Den genauen Netznamen (`br0` vs. `bond0`) und eine freie IP klären wir direkt auf
+der Box (`docker network ls`, `docker network inspect <name>`). Aufruf danach:
+`http://<container-ip>:3000`.
 
 ### Update auf eine neue Version
 ```bash
