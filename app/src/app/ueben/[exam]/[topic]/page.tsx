@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
@@ -8,7 +8,8 @@ import Link from 'next/link';
 import type { Question, ExamType, AnswerKey, SessionStats } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
 import { FeedbackModal } from '@/components/ui/FeedbackModal';
-import { binnenTopics, seeTopics, getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
+import { getExamQuestions, getExamTopics } from '@/data/topics';
+import { isBinnenZusatzOnly } from '@/lib/settings';
 import {
   loadProgress,
   saveProgress,
@@ -38,19 +39,17 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-function getTopicQuestions(topicId: string, exam: ExamType): Question[] {
-  const topics = exam === 'binnen' ? binnenTopics : seeTopics;
-  const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
-  const topic = topics.find((t) => t.id === topicId);
+function getTopicQuestions(topicId: string, exam: ExamType, zusatz: boolean): Question[] {
+  const topic = getExamTopics(exam, zusatz).find((t) => t.id === topicId);
   if (!topic) return [];
-  return allQuestions.filter((q) => topic.questionIds.includes(q.id));
+  const idSet = new Set(topic.questionIds);
+  return getExamQuestions(exam, zusatz).filter((q) => idSet.has(q.id));
 }
 
 function getTopicName(topicId: string, exam: ExamType): string {
   if (topicId === HARD_QUESTIONS_TOPIC_ID) return 'Deine Problemfragen';
   if (topicId === DAILY_QUEUE_TOPIC_ID) return 'Heute lernen';
-  const topics = exam === 'binnen' ? binnenTopics : seeTopics;
-  return topics.find((t) => t.id === topicId)?.name ?? topicId;
+  return getExamTopics(exam, false).find((t) => t.id === topicId)?.name ?? topicId;
 }
 
 function isQueueMode(topicId: string): boolean {
@@ -91,9 +90,9 @@ function viewForIndex(state: QuizState, idx: number): QuestionView {
   return makeView(state.questions[idx]);
 }
 
-function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizState {
+function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz: boolean): QuizState {
   const progress = loadProgress();
-  const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
+  const allQuestions = getExamQuestions(exam, zusatz);
 
   let questions: Question[];
   if (topicId === DAILY_QUEUE_TOPIC_ID) {
@@ -101,7 +100,7 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizS
   } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
   } else {
-    const topicQuestions = getTopicQuestions(topicId, exam);
+    const topicQuestions = getTopicQuestions(topicId, exam, zusatz);
     const unpassed = topicQuestions.filter((q) => !isQuestionPassed(progress, q.id, exam));
     questions = shuffleArray(unpassed.length > 0 ? unpassed : topicQuestions);
   }
@@ -116,18 +115,21 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number): QuizS
 // Delay before auto-advancing after a correct answer (ms).
 const AUTO_ADVANCE_MS = 750;
 
-// How many cards later a missed question is re-inserted for in-session relearning.
-const RELEARN_GAP = 4;
+// In-session relearning steps: a missed question must be answered correctly
+// again after each of these gaps (in cards) before it's done for the session.
+// Growing gaps test recall at increasing spacing, not just short-term memory.
+const RELEARN_STEPS = [3, 8];
 
 export default function QuizPage(): React.ReactElement {
   const params = useParams();
   const exam = params.exam as ExamType;
   const topicId = params.topic as string;
-  const allQuestions = exam === 'binnen' ? getAllBinnenQuestions() : getAllSeeQuestions();
+  const binnenZusatz = isBinnenZusatzOnly();
+  const allQuestions = getExamQuestions(exam, binnenZusatz);
   const mounted = useMounted();
 
   const [{ progress, questions, currentIdx, view }, setQuiz] = useState<QuizState>(() =>
-    initQuizState(topicId, exam, 0),
+    initQuizState(topicId, exam, 0, binnenZusatz),
   );
   const { options: shuffledOptions, selectedAnswer, isRevealed } = view;
 
@@ -136,6 +138,8 @@ export default function QuizPage(): React.ReactElement {
   // Set when a correct answer should auto-advance after a short delay.
   const [pendingAdvance, setPendingAdvance] = useState(false);
   const [soundOn, setSoundOn] = useState<boolean>(() => isSoundEnabled());
+  // Remaining relearning steps per question id (session-scoped, no re-render).
+  const relearnRef = useRef<Map<number, number>>(new Map());
 
   const canGoBack = currentIdx > 0 && !pendingAdvance;
 
@@ -155,17 +159,34 @@ export default function QuizPage(): React.ReactElement {
       const updatedProgress = recordAnswer(progress, currentQuestion.id, exam, isCorrect);
       saveProgress(updatedProgress);
 
+      // Decide whether to re-insert this card for relearning, and after how many
+      // cards. Wrong → restart the step ladder (first gap). Correct while still
+      // relearning → advance to the next, larger gap until the ladder is done.
+      const qid = currentQuestion.id;
+      const stepsLeft = relearnRef.current.get(qid) ?? 0;
+      let reinsertGap: number | null = null;
+      if (!isCorrect) {
+        relearnRef.current.set(qid, RELEARN_STEPS.length);
+        reinsertGap = RELEARN_STEPS[0];
+      } else if (stepsLeft > 0) {
+        const remaining = stepsLeft - 1;
+        if (remaining > 0) {
+          relearnRef.current.set(qid, remaining);
+          reinsertGap = RELEARN_STEPS[RELEARN_STEPS.length - remaining];
+        } else {
+          relearnRef.current.delete(qid); // graduated for this session
+        }
+      }
+
       setQuiz((prev) => {
         const answered = {
           ...prev.answered,
           [prev.currentIdx]: { options: prev.view.options, selectedAnswer: key },
         };
         let nextQuestions = prev.questions;
-        if (!isCorrect) {
-          // Re-show a missed question a few cards later (spacing within the
-          // session) so it's relearned before the deck ends, not only at the end.
+        if (reinsertGap !== null) {
           nextQuestions = [...prev.questions];
-          const insertIdx = Math.min(prev.currentIdx + RELEARN_GAP, nextQuestions.length);
+          const insertIdx = Math.min(prev.currentIdx + reinsertGap, nextQuestions.length);
           nextQuestions.splice(insertIdx, 0, prev.questions[prev.currentIdx]);
         }
         return {
@@ -209,7 +230,7 @@ export default function QuizPage(): React.ReactElement {
         setIsComplete(true);
         return;
       }
-      const topicQuestions = getTopicQuestions(topicId, exam);
+      const topicQuestions = getTopicQuestions(topicId, exam, binnenZusatz);
       if (isTopicPassed(progress, topicQuestions.map((q) => q.id), exam)) {
         setIsComplete(true);
         return;
@@ -228,7 +249,7 @@ export default function QuizPage(): React.ReactElement {
       currentIdx: prev.currentIdx + 1,
       view: viewForIndex(prev, prev.currentIdx + 1),
     }));
-  }, [currentIdx, questions, topicId, exam, progress, allQuestions]);
+  }, [currentIdx, questions, topicId, exam, progress, allQuestions, binnenZusatz]);
 
   const handleBack = useCallback((): void => {
     setPendingAdvance(false);

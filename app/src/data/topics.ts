@@ -1,4 +1,4 @@
-import type { Topic } from '@/lib/types';
+import type { Topic, Question, ExamType } from '@/lib/types';
 import { basisQuestions } from './basis-questions';
 import { binnenSpecificQuestions, binnenSegelQuestions } from './binnen-questions';
 import { seeSpecificQuestions, seeNavigationQuestions } from './see-questions';
@@ -8,6 +8,10 @@ const getIdsByTopic = (questions: { id: number; topic: string }[], topicId: stri
 
 const allBinnenQuestions = [...basisQuestions, ...binnenSpecificQuestions, ...binnenSegelQuestions];
 const allSeeQuestions = [...basisQuestions, ...seeSpecificQuestions, ...seeNavigationQuestions];
+
+// "Zusatz" = Binnen without the shared basis catalog (specific + sailing only).
+const binnenZusatzQuestions = [...binnenSpecificQuestions, ...binnenSegelQuestions];
+const binnenZusatzIds = new Set(binnenZusatzQuestions.map((q) => q.id));
 
 export const binnenTopics: Topic[] = [
   {
@@ -257,3 +261,25 @@ export const seeTopics: Topic[] = [
 
 export const getAllBinnenQuestions = () => allBinnenQuestions;
 export const getAllSeeQuestions = () => allSeeQuestions;
+
+// --- "Binnen als Zusatzkatalog" support -------------------------------------
+
+export function getBinnenQuestions(zusatzOnly: boolean): Question[] {
+  return zusatzOnly ? binnenZusatzQuestions : allBinnenQuestions;
+}
+
+export function getBinnenTopics(zusatzOnly: boolean): Topic[] {
+  if (!zusatzOnly) return binnenTopics;
+  return binnenTopics
+    .map((t) => ({ ...t, questionIds: t.questionIds.filter((id) => binnenZusatzIds.has(id)) }))
+    .filter((t) => t.questionIds.length > 0);
+}
+
+/** Effective question set / topics for an exam, honouring the Binnen-Zusatz setting. */
+export function getExamQuestions(exam: ExamType, binnenZusatzOnly: boolean): Question[] {
+  return exam === 'binnen' ? getBinnenQuestions(binnenZusatzOnly) : allSeeQuestions;
+}
+
+export function getExamTopics(exam: ExamType, binnenZusatzOnly: boolean): Topic[] {
+  return exam === 'binnen' ? getBinnenTopics(binnenZusatzOnly) : seeTopics;
+}

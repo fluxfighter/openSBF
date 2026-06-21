@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { TopicCard } from '@/components/quiz/TopicCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -12,6 +12,8 @@ import {
   getHardestQuestions,
 } from '@/lib/progress';
 import { getQueueCounts, getReadiness, type QueueCounts } from '@/lib/srs';
+import { getBinnenTopics, getBinnenQuestions } from '@/data/topics';
+import { isBinnenZusatzOnly, setBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
 import type { ExamType, Topic, Question, AccentColor, TopicProgressEntry } from '@/lib/types';
 
@@ -70,11 +72,23 @@ export function ExamTopicsPage({
   quickLinks,
 }: ExamTopicsPageProps): React.ReactElement {
   const mounted = useMounted();
-  const [{ overall, progressData, hardCount, queue, readiness }] = useState(() =>
-    computeExamProgress(exam, topics, getAllQuestions),
-  );
+  const [zusatz, setZusatz] = useState<boolean>(() => exam === 'binnen' && isBinnenZusatzOnly());
+
+  const { overall, progressData, hardCount, queue, readiness, effectiveTopics } = useMemo(() => {
+    const t = exam === 'binnen' ? getBinnenTopics(zusatz) : topics;
+    const getQs: () => Question[] = exam === 'binnen' ? () => getBinnenQuestions(zusatz) : getAllQuestions;
+    return { ...computeExamProgress(exam, t, getQs), effectiveTopics: t };
+  }, [exam, zusatz, topics, getAllQuestions]);
+
+  const toggleZusatz = (): void => {
+    setZusatz((v) => {
+      setBinnenZusatzOnly(!v);
+      return !v;
+    });
+  };
 
   const passedTopics = Object.values(progressData).filter((p) => p.isPassed).length;
+  const totalTopics = effectiveTopics.length;
 
   // Small-bites motivation: how many days to finish at a steady pace.
   const remaining = Math.max(0, overall.total - overall.passed);
@@ -137,12 +151,35 @@ export function ExamTopicsPage({
             <ProgressBar
               value={overall.percentage}
               showLabel
-              label={`${overall.passed}/${overall.total} Fragen · ${passedTopics}/${topics.length} Themen`}
+              label={`${overall.passed}/${overall.total} Fragen · ${passedTopics}/${totalTopics} Themen`}
               size="md"
               color={accentColor}
               animated={overall.percentage > 0 && overall.percentage < 100}
             />
           </div>
+
+          {exam === 'binnen' && (
+            <button
+              onClick={toggleZusatz}
+              className="mt-5 flex items-center gap-3 text-left"
+              role="switch"
+              aria-checked={zusatz}
+            >
+              <span
+                className="relative w-9 h-5 rounded-full transition-colors shrink-0"
+                style={{ background: zusatz ? accentVar : 'rgba(255,255,255,0.12)' }}
+              >
+                <span
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+                  style={{ left: zusatz ? '18px' : '2px' }}
+                />
+              </span>
+              <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                Nur Zusatzfragen (ohne Basis) —{' '}
+                <span style={{ color: 'var(--white)' }}>für alle, die schon SBF See lernen</span>
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -249,7 +286,7 @@ export function ExamTopicsPage({
         {quickLinks && <div className="mb-6">{quickLinks}</div>}
 
         <div className="grid sm:grid-cols-2 gap-3">
-          {topics
+          {effectiveTopics
             .filter((t) => (progressData[t.id]?.total ?? 0) > 0)
             .map((topic) => {
               const pd = progressData[topic.id] ?? { passed: 0, total: 0, percentage: 0, isPassed: false };

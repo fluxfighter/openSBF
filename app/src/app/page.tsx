@@ -6,8 +6,9 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { loadProgress, getExamOverallProgress } from '@/lib/progress';
 import { getQueueCounts } from '@/lib/srs';
 import { getStreak, getXp, getTodayCount, DAILY_GOAL } from '@/lib/gamification';
+import { isBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
-import { getAllBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
+import { getBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
 import { CertificateCard } from '@/components/ui/CertificateCard';
 
 const tutorialLinks = [
@@ -47,7 +48,7 @@ const ZERO_STATS: ExamHomeStats = {
 function useExamProgress(): ExamHomeStats {
   const [stats] = useState<ExamHomeStats>(() => {
     const progress = loadProgress();
-    const binnen = getAllBinnenQuestions();
+    const binnen = getBinnenQuestions(isBinnenZusatzOnly());
     const see = getAllSeeQuestions();
     return {
       binnenPct: getExamOverallProgress(progress, binnen.map((q) => q.id), 'binnen').percentage,
