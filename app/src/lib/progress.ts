@@ -5,7 +5,7 @@ const STORAGE_KEY = 'opensbf_progress';
 const CORRECT_THRESHOLD = 3;
 
 function emptyProgress(): UserProgress {
-  return { questions: {}, topics: {}, pruefungsboegen: {}, bookmarks: {}, lastUpdated: new Date().toISOString() };
+  return { questions: {}, topics: {}, pruefungsboegen: {}, bookmarks: {}, dailySessions: {}, lastUpdated: new Date().toISOString() };
 }
 
 export function loadProgress(): UserProgress {
@@ -16,6 +16,7 @@ export function loadProgress(): UserProgress {
   // backfill for older stored data that predates these fields
   if (!parsed.pruefungsboegen) parsed.pruefungsboegen = {};
   if (!parsed.bookmarks) parsed.bookmarks = {};
+  if (!parsed.dailySessions) parsed.dailySessions = {};
   return parsed;
 }
 
@@ -311,11 +312,24 @@ export function mergeProgress(current: UserProgress, imported: UserProgress): Us
     if (on) mergedBookmarks[key] = true;
   }
 
+  // Daily sessions: per exam, keep whichever side is further along today
+  // (fewer IDs remaining = more answered). Stale sessions (yesterday) are dropped.
+  const today = new Date().toISOString().slice(0, 10);
+  const mergedSessions: NonNullable<UserProgress['dailySessions']> = { ...(current.dailySessions ?? {}) };
+  for (const [exam, importedSession] of Object.entries(imported.dailySessions ?? {})) {
+    if (importedSession.date !== today) continue;
+    const existing = mergedSessions[exam];
+    if (!existing || existing.date !== today || importedSession.queueIds.length < existing.queueIds.length) {
+      mergedSessions[exam] = importedSession;
+    }
+  }
+
   return {
     questions: merged,
     topics: {},
     pruefungsboegen: mergedPb,
     bookmarks: mergedBookmarks,
+    dailySessions: mergedSessions,
     lastUpdated: new Date().toISOString(),
   };
 }

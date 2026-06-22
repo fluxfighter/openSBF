@@ -56,12 +56,20 @@ export interface TopicProgress {
   passedQuestions: number;
 }
 
+export interface DailySession {
+  date: string;       // YYYY-MM-DD — sessions from previous days are ignored
+  queueIds: number[]; // ordered question IDs for the day's learning queue
+}
+
 export interface UserProgress {
   questions: Record<string, QuestionProgress>;
   topics: Record<string, TopicProgress>;
   pruefungsboegen: Record<string, ExamResult[]>;
   // Bookmarked ("gemerkte") questions, keyed by `${exam}_${id}`.
   bookmarks: Record<string, boolean>;
+  // Daily session queues, keyed by exam. Synced across devices so resuming
+  // on a different device continues the same queue in the same order.
+  dailySessions?: Record<string, DailySession>;
   lastUpdated: string;
 }
 

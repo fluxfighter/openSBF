@@ -47,28 +47,29 @@ function todayStr(): string {
 
 function loadSessionQueue(exam: ExamType): number[] | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(`opensbf_session_${exam}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { date: string; queueIds: number[] };
-    if (parsed.date !== todayStr()) return null;
-    return parsed.queueIds;
-  } catch {
-    return null;
-  }
+  const session = loadProgress().dailySessions?.[exam];
+  if (!session || session.date !== todayStr()) return null;
+  return session.queueIds;
 }
 
 function saveSessionQueue(exam: ExamType, questions: Question[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(
-    `opensbf_session_${exam}`,
-    JSON.stringify({ date: todayStr(), queueIds: questions.map((q) => q.id) }),
-  );
+  const progress = loadProgress();
+  saveProgress({
+    ...progress,
+    dailySessions: {
+      ...(progress.dailySessions ?? {}),
+      [exam]: { date: todayStr(), queueIds: questions.map((q) => q.id) },
+    },
+  });
 }
 
 function clearSessionQueue(exam: ExamType): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(`opensbf_session_${exam}`);
+  const progress = loadProgress();
+  const sessions = { ...(progress.dailySessions ?? {}) };
+  delete sessions[exam];
+  saveProgress({ ...progress, dailySessions: sessions });
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
