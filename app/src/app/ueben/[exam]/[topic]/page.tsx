@@ -143,20 +143,26 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
 
   let questions: Question[];
   if (topicId === DAILY_QUEUE_TOPIC_ID) {
-    const fresh = buildDailyQueue(progress, exam, allQuestions);
     const savedIds = loadSessionQueue(exam);
     if (savedIds && savedIds.length > 0) {
-      // Restore the saved order; keep only questions still in today's queue.
-      const stillDueIds = new Set(fresh.map((q) => q.id));
+      // Restore saved order, excluding only questions already answered correctly
+      // today (due date in the future). Check SRS state directly instead of
+      // re-running buildDailyQueue, which would re-shuffle new questions and
+      // drop some of the original session's cards from the restored set.
       const idToQ = new Map(allQuestions.map((q) => [q.id, q]));
+      const now = Date.now();
       const restored = savedIds
-        .filter((id) => stillDueIds.has(id))
         .map((id) => idToQ.get(id))
-        .filter((q): q is Question => q !== undefined);
-      questions = restored.length > 0 ? restored : fresh;
+        .filter((q): q is Question => {
+          if (!q) return false;
+          const p = progress.questions[`${exam}_${q.id}`];
+          if (!p || !p.due) return true; // unseen → keep
+          return new Date(p.due).getTime() <= now; // due → keep, future → answered, drop
+        });
+      questions = restored.length > 0 ? restored : buildDailyQueue(progress, exam, allQuestions);
     } else {
-      questions = fresh;
-      saveSessionQueue(exam, fresh);
+      questions = buildDailyQueue(progress, exam, allQuestions);
+      saveSessionQueue(exam, questions);
     }
   } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
