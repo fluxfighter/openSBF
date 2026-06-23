@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { Topic } from '@/lib/types';
-import { SegmentedBar } from '@/components/ui/SegmentedBar';
+import { MasteryBar, MASTERY_COLORS } from '@/components/ui/MasteryBar';
 
 interface TopicCardProps {
   topic: Topic;
@@ -11,8 +11,6 @@ interface TopicCardProps {
   struggling: number;
   total: number;
   percentage: number;
-  learningPct: number;
-  strugglingPct: number;
   isPassed: boolean;
   exam: 'binnen' | 'see';
 }
@@ -24,8 +22,6 @@ export function TopicCard({
   struggling,
   total,
   percentage,
-  learningPct,
-  strugglingPct,
   isPassed,
   exam,
 }: TopicCardProps): React.ReactElement {
@@ -61,23 +57,15 @@ export function TopicCard({
         )}
       </div>
 
-      {/* Multi-colour bar: dunkelgrün = gelernt, hellgrün = lernend, rot = schwierig, Rest = neu */}
-      <SegmentedBar
-        className="mb-2"
-        segments={[
-          { pct: percentage, color: 'var(--green-deep)' },
-          { pct: learningPct, color: 'var(--green-light)' },
-          { pct: strugglingPct, color: 'var(--red-signal)' },
-        ]}
-      />
+      <MasteryBar className="mb-2" breakdown={{ passed, learning, struggling, total }} />
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs tabular-nums" style={{ color: 'var(--muted)' }}>
           {seen > 0 ? (
             <>
-              <span style={{ color: 'var(--green-deep)' }}>{passed}</span>
-              {learning > 0 && <span style={{ color: 'var(--green-light)' }}> · {learning}</span>}
-              {struggling > 0 && <span style={{ color: 'var(--red-signal)' }}> · {struggling}</span>}
+              <span style={{ color: MASTERY_COLORS.learned }}>{passed}</span>
+              {learning > 0 && <span style={{ color: MASTERY_COLORS.learning }}> · {learning}</span>}
+              {struggling > 0 && <span style={{ color: MASTERY_COLORS.weak }}> · {struggling}</span>}
               <span style={{ color: 'var(--muted)' }}> / {total}</span>
             </>
           ) : (

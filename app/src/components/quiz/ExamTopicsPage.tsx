@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { TopicCard } from '@/components/quiz/TopicCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { MasteryBar, MasteryLegend } from '@/components/ui/MasteryBar';
 import {
   loadProgress,
   getTopicProgress,
@@ -31,7 +32,7 @@ interface ExamTopicsPageProps {
 }
 
 interface ExamProgressSnapshot {
-  overall: { passed: number; total: number; percentage: number };
+  overall: { passed: number; learning: number; struggling: number; total: number; percentage: number };
   progressData: Record<string, TopicProgressEntry>;
   hardCount: number;
   bookmarkCount: number;
@@ -152,14 +153,25 @@ export function ExamTopicsPage({
           </p>
 
           <div className="mt-6 max-w-md">
-            <ProgressBar
-              value={overall.percentage}
-              showLabel
-              label={`${overall.passed}/${overall.total} Fragen · ${passedTopics}/${totalTopics} Themen`}
-              size="md"
-              color={accentColor}
-              animated={overall.percentage > 0 && overall.percentage < 100}
+            <div className="flex items-center justify-between mb-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+              <span>
+                <span className="font-semibold tabular-nums" style={{ color: 'var(--white)' }}>
+                  {overall.passed}/{overall.total}
+                </span>{' '}
+                Fragen gelernt
+              </span>
+              <span className="tabular-nums">{passedTopics}/{totalTopics} Themen</span>
+            </div>
+            <MasteryBar
+              heightClass="h-2"
+              breakdown={{
+                passed: overall.passed,
+                learning: overall.learning,
+                struggling: overall.struggling,
+                total: overall.total,
+              }}
             />
+            <MasteryLegend className="mt-2.5" />
           </div>
 
           {exam === 'binnen' && (
@@ -244,7 +256,7 @@ export function ExamTopicsPage({
           </div>
         </Link>
 
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-5">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
             Themengebiete
           </h2>
@@ -255,14 +267,6 @@ export function ExamTopicsPage({
           >
             Alle Fragen ansehen →
           </Link>
-        </div>
-
-        {/* Colour legend for the topic progress bars */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-5 text-xs" style={{ color: 'var(--muted)' }}>
-          <LegendDot color="var(--green-deep)" label="gelernt" />
-          <LegendDot color="var(--green-light)" label="im Lernen" />
-          <LegendDot color="var(--red-signal)" label="schwierig" />
-          <LegendDot color="rgba(255,255,255,0.12)" label="neu" />
         </div>
 
         {hardCount > 0 && (
@@ -346,8 +350,6 @@ export function ExamTopicsPage({
                   struggling={pd.struggling}
                   total={pd.total}
                   percentage={pd.percentage}
-                  learningPct={pd.learningPct}
-                  strugglingPct={pd.strugglingPct}
                   isPassed={pd.isPassed}
                   exam={exam}
                 />
@@ -371,16 +373,3 @@ export function ExamTopicsPage({
   );
 }
 
-interface LegendDotProps {
-  color: string;
-  label: string;
-}
-
-function LegendDot({ color, label }: LegendDotProps): React.ReactElement {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-      {label}
-    </span>
-  );
-}

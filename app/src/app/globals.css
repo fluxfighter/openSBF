@@ -21,8 +21,14 @@
   /* Semantic */
   --red-signal:   #E84444;
   --green-signal: #12B870;
-  --green-deep:   #0A7D4A; /* gelernt — fully mastered (dark green) */
-  --green-light:  #4ADE9B; /* lernend — in progress (light green) */
+
+  /* Mastery breakdown palette — tuned for the dark nautical theme.
+     A calm sea-green progression for progress, a soft terracotta (not an
+     alarming red) for "needs work", so the bars read as guidance, not alarm. */
+  --mastery-learned:  #36A57D; /* gelernt — fully mastered */
+  --mastery-learning: #79C9AD; /* im Lernen — in progress */
+  --mastery-weak:     #CC8270; /* schwierig — soft terracotta */
+  --mastery-track:    rgba(255,255,255,0.10); /* neu / remainder */
 
   /* Text */
   --white: #E8EEF6;

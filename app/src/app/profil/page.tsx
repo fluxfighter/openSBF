@@ -9,7 +9,7 @@ import {
   resetProgress,
 } from '@/lib/progress';
 import { seeTopics, getBinnenTopics, getBinnenQuestions, getAllSeeQuestions } from '@/data/topics';
-import { ProgressBar } from '@/components/ui/ProgressBar';
+import { MasteryBar } from '@/components/ui/MasteryBar';
 import { ProgressSync } from '@/components/ui/ProgressSync';
 import { isBinnenZusatzOnly } from '@/lib/settings';
 import { useMounted } from '@/hooks/useMounted';
@@ -21,6 +21,8 @@ interface ExamStats {
   totalQuestions: number;
   answeredQuestions: number;
   passedQuestions: number;
+  learningQuestions: number;
+  strugglingQuestions: number;
   totalTopics: number;
   passedTopics: number;
   percentage: number;
@@ -61,6 +63,8 @@ function computeExamStats(
     totalQuestions,
     answeredQuestions,
     passedQuestions,
+    learningQuestions: overall.learning,
+    strugglingQuestions: overall.struggling,
     totalTopics: topics.length,
     passedTopics,
     percentage: overall.percentage,
@@ -159,13 +163,23 @@ function ExamSection({ title, icon, href, stats }: ExamSectionProps) {
         </Link>
       </div>
 
-      <ProgressBar
-        value={stats.percentage}
-        showLabel
-        label={`${stats.passedQuestions} von ${stats.totalQuestions} Fragen bestanden`}
-        size="md"
-        color={isPerfect ? 'green' : 'gold'}
-        animated={stats.percentage > 0 && stats.percentage < 100}
+      <div className="flex items-center justify-between mb-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+        <span>
+          <span className="font-semibold tabular-nums" style={{ color: 'var(--white)' }}>
+            {stats.passedQuestions}
+          </span>{' '}
+          von {stats.totalQuestions} Fragen gelernt
+        </span>
+        <span className="tabular-nums">{stats.percentage}%</span>
+      </div>
+      <MasteryBar
+        heightClass="h-2"
+        breakdown={{
+          passed: stats.passedQuestions,
+          learning: stats.learningQuestions,
+          struggling: stats.strugglingQuestions,
+          total: stats.totalQuestions,
+        }}
       />
 
       <div className="grid grid-cols-3 gap-2 mt-4">
@@ -363,15 +377,17 @@ export default function ProfilPage(): React.ReactElement {
                       {binnenStats.recentAnswers} in letzten 7 Tagen
                     </span>
                   </div>
-                  <ProgressBar
-                    value={binnenStats.passedQuestions}
-                    max={binnenStats.totalQuestions}
-                    size="sm"
-                    color="gold"
+                  <MasteryBar
+                    breakdown={{
+                      passed: binnenStats.passedQuestions,
+                      learning: binnenStats.learningQuestions,
+                      struggling: binnenStats.strugglingQuestions,
+                      total: binnenStats.totalQuestions,
+                    }}
                   />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {binnenStats.passedQuestions} bestanden
+                      {binnenStats.passedQuestions} gelernt
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {binnenStats.percentage}%
@@ -388,15 +404,17 @@ export default function ProfilPage(): React.ReactElement {
                       {seeStats.recentAnswers} in letzten 7 Tagen
                     </span>
                   </div>
-                  <ProgressBar
-                    value={seeStats.passedQuestions}
-                    max={seeStats.totalQuestions}
-                    size="sm"
-                    color="seafoam"
+                  <MasteryBar
+                    breakdown={{
+                      passed: seeStats.passedQuestions,
+                      learning: seeStats.learningQuestions,
+                      struggling: seeStats.strugglingQuestions,
+                      total: seeStats.totalQuestions,
+                    }}
                   />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
-                      {seeStats.passedQuestions} bestanden
+                      {seeStats.passedQuestions} gelernt
                     </span>
                     <span className="text-xs" style={{ color: 'var(--muted)' }}>
                       {seeStats.percentage}%

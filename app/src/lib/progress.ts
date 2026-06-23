@@ -375,7 +375,7 @@ export function getExamOverallProgress(
   progress: UserProgress,
   allQuestionIds: number[],
   exam: ExamType,
-): { passed: number; total: number; percentage: number } {
+): ReturnType<typeof getTopicProgress> {
   return getTopicProgress(progress, allQuestionIds, exam);
 }
 

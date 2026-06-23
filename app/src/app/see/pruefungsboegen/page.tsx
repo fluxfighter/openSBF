@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { seePruefungsboegen } from '@/data/pruefungsboegen';
 import { loadProgress, getTopicProgress, getPruefungsbogenStats } from '@/lib/progress';
-import { SegmentedBar } from '@/components/ui/SegmentedBar';
+import { MasteryBar } from '@/components/ui/MasteryBar';
 import { useMounted } from '@/hooks/useMounted';
 import type { PruefungsbogenStats, TopicProgressEntry, UserProgress } from '@/lib/types';
 
@@ -70,12 +70,13 @@ function PbCard({ nummer, coverage, stats }: PbCardProps): React.ReactElement {
             {started > 0 ? `${coverage.passed}/${coverage.total}` : `0/${coverage.total}`}
           </span>
         </div>
-        <SegmentedBar
-          segments={[
-            { pct: coverage.percentage, color: 'var(--green-deep)' },
-            { pct: coverage.learningPct, color: 'var(--green-light)' },
-            { pct: coverage.strugglingPct, color: 'var(--red-signal)' },
-          ]}
+        <MasteryBar
+          breakdown={{
+            passed: coverage.passed,
+            learning: coverage.learning,
+            struggling: coverage.struggling,
+            total: coverage.total,
+          }}
         />
       </div>
 
