@@ -45,31 +45,29 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function loadSessionQueue(exam: ExamType): number[] | null {
-  if (typeof window === 'undefined') return null;
-  const session = loadProgress().dailySessions?.[exam];
+// Today's saved queue order for this exam, or null if none / from a past day.
+function getSessionQueueIds(progress: UserProgress, exam: ExamType): number[] | null {
+  const session = progress.dailySessions?.[exam];
   if (!session || session.date !== todayStr()) return null;
   return session.queueIds;
 }
 
-function saveSessionQueue(exam: ExamType, questions: Question[]): void {
-  if (typeof window === 'undefined') return;
-  const progress = loadProgress();
-  saveProgress({
+// Pure: returns new progress carrying today's queue order for this exam.
+function withSessionQueue(progress: UserProgress, exam: ExamType, questions: Question[]): UserProgress {
+  return {
     ...progress,
     dailySessions: {
       ...(progress.dailySessions ?? {}),
       [exam]: { date: todayStr(), queueIds: questions.map((q) => q.id) },
     },
-  });
+  };
 }
 
-function clearSessionQueue(exam: ExamType): void {
-  if (typeof window === 'undefined') return;
-  const progress = loadProgress();
+// Pure: returns new progress with today's session for this exam removed.
+function withoutSessionQueue(progress: UserProgress, exam: ExamType): UserProgress {
   const sessions = { ...(progress.dailySessions ?? {}) };
   delete sessions[exam];
-  saveProgress({ ...progress, dailySessions: sessions });
+  return { ...progress, dailySessions: sessions };
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -138,31 +136,40 @@ function viewForIndex(state: QuizState, idx: number): QuestionView {
 }
 
 function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz: boolean): QuizState {
-  const progress = loadProgress();
+  let progress = loadProgress();
   const allQuestions = getExamQuestions(exam, zusatz);
 
   let questions: Question[];
   if (topicId === DAILY_QUEUE_TOPIC_ID) {
-    const savedIds = loadSessionQueue(exam);
-    if (savedIds && savedIds.length > 0) {
-      // Restore saved order, excluding only questions already answered correctly
-      // today (due date in the future). Check SRS state directly instead of
-      // re-running buildDailyQueue, which would re-shuffle new questions and
-      // drop some of the original session's cards from the restored set.
-      const idToQ = new Map(allQuestions.map((q) => [q.id, q]));
-      const now = Date.now();
-      const restored = savedIds
-        .map((id) => idToQ.get(id))
-        .filter((q): q is Question => {
-          if (!q) return false;
-          const p = progress.questions[`${exam}_${q.id}`];
-          if (!p || !p.due) return true; // unseen → keep
-          return new Date(p.due).getTime() <= now; // due → keep, future → answered, drop
-        });
-      questions = restored.length > 0 ? restored : buildDailyQueue(progress, exam, allQuestions);
+    const savedIds = getSessionQueueIds(progress, exam);
+    // Restore saved order, excluding only questions already answered correctly
+    // today (due date in the future). Check SRS state directly instead of
+    // re-running buildDailyQueue, which would re-shuffle new questions and
+    // drop some of the original session's cards from the restored set.
+    const restored = savedIds
+      ? (() => {
+          const idToQ = new Map(allQuestions.map((q) => [q.id, q]));
+          const now = Date.now();
+          return savedIds
+            .map((id) => idToQ.get(id))
+            .filter((q): q is Question => {
+              if (!q) return false;
+              const p = progress.questions[`${exam}_${q.id}`];
+              if (!p || !p.due) return true; // unseen → keep
+              return new Date(p.due).getTime() <= now; // due → keep, future → answered, drop
+            });
+        })()
+      : [];
+
+    if (restored.length > 0) {
+      questions = restored;
     } else {
       questions = buildDailyQueue(progress, exam, allQuestions);
-      saveSessionQueue(exam, questions);
+      // Bake the session into the progress that goes into state, then persist
+      // once. Because recordAnswer/saveProgress spread this progress, the saved
+      // session survives every subsequent answer (the previous bug overwrote it).
+      progress = withSessionQueue(progress, exam, questions);
+      saveProgress(progress);
     }
   } else if (topicId === HARD_QUESTIONS_TOPIC_ID) {
     questions = shuffleArray(getHardestQuestions(progress, exam, allQuestions));
@@ -301,7 +308,7 @@ export default function QuizPage(): React.ReactElement {
         // in new ones, so the session keeps going until today's queue is clear.
         const stillDue = buildDailyQueue(progress, exam, allQuestions, { includeNew: false });
         if (stillDue.length === 0) {
-          clearSessionQueue(exam);
+          saveProgress(withoutSessionQueue(progress, exam));
           setIsComplete(true);
           return;
         }

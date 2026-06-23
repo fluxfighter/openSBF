@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { seePruefungsboegen } from '@/data/pruefungsboegen';
 import { loadProgress, getTopicProgress, getPruefungsbogenStats } from '@/lib/progress';
+import { SegmentedBar } from '@/components/ui/SegmentedBar';
 import { useMounted } from '@/hooks/useMounted';
-import type { PruefungsbogenStats, UserProgress } from '@/lib/types';
+import type { PruefungsbogenStats, TopicProgressEntry, UserProgress } from '@/lib/types';
 
 const PASS_MAX_WRONG = 3;
 const QUESTIONS_PER_BOGEN = 30;
@@ -21,7 +22,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 interface PbCardProps {
   nummer: number;
-  coverage: { passed: number; total: number; percentage: number };
+  coverage: Omit<TopicProgressEntry, 'isPassed'>;
   stats: PruefungsbogenStats;
 }
 
@@ -29,6 +30,7 @@ function PbCard({ nummer, coverage, stats }: PbCardProps): React.ReactElement {
   const numStr = String(nummer).padStart(2, '0');
   const everPassed = stats.passedCount > 0;
   const attempted = stats.attempts > 0;
+  const started = coverage.passed + coverage.learning + coverage.struggling;
 
   let borderColor = 'var(--border)';
   if (everPassed) borderColor = 'rgba(18,184,112,0.25)';
@@ -60,23 +62,21 @@ function PbCard({ nummer, coverage, stats }: PbCardProps): React.ReactElement {
         )}
       </div>
 
-      {/* Catalog coverage: how many of this bogen's questions you've mastered */}
+      {/* Catalog coverage: dunkelgrün = gelernt, hellgrün = im Lernen, rot = schwierig */}
       <div className="mb-3">
         <div className="flex items-center justify-between text-xs mb-1">
-          <span style={{ color: 'var(--muted)' }}>Fragen gelernt</span>
+          <span style={{ color: 'var(--muted)' }}>Fortschritt</span>
           <span className="font-semibold tabular-nums" style={{ color: 'var(--white)' }}>
-            {coverage.passed}/{coverage.total}
+            {started > 0 ? `${coverage.passed}/${coverage.total}` : `0/${coverage.total}`}
           </span>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${coverage.percentage}%`,
-              background: coverage.percentage === 100 ? 'var(--green-signal)' : 'var(--seafoam)',
-            }}
-          />
-        </div>
+        <SegmentedBar
+          segments={[
+            { pct: coverage.percentage, color: 'var(--green-deep)' },
+            { pct: coverage.learningPct, color: 'var(--green-light)' },
+            { pct: coverage.strugglingPct, color: 'var(--red-signal)' },
+          ]}
+        />
       </div>
 
       {/* Attempt statistics */}

@@ -241,21 +241,35 @@ export function getTopicProgress(
   progress: UserProgress,
   questionIds: number[],
   exam: ExamType,
-): { passed: number; learning: number; total: number; percentage: number; learningPct: number } {
+): {
+  passed: number;
+  learning: number;
+  struggling: number;
+  total: number;
+  percentage: number;
+  learningPct: number;
+  strugglingPct: number;
+} {
   const total = questionIds.length;
   let passed = 0;
   let learning = 0;
+  let struggling = 0;
   for (const id of questionIds) {
-    const streak = getQuestionStreak(progress, id, exam);
-    if (streak >= CORRECT_THRESHOLD) passed++;
-    else if (streak >= 1) learning++;
+    const entry = progress.questions[getQuestionKey(id, exam)];
+    if (!entry) continue; // never seen → neutral remainder
+    const streak = entry.reps ?? entry.correctCount ?? 0;
+    if (streak >= CORRECT_THRESHOLD) passed++; // gelernt
+    else if (streak >= 1) learning++; // lernend (last answer correct, not yet mastered)
+    else struggling++; // seen but currently wrong (streak reset to 0)
   }
   return {
     passed,
     learning,
+    struggling,
     total,
     percentage: total > 0 ? Math.round((passed / total) * 100) : 0,
     learningPct: total > 0 ? Math.round((learning / total) * 100) : 0,
+    strugglingPct: total > 0 ? Math.round((struggling / total) * 100) : 0,
   };
 }
 

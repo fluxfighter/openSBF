@@ -2,20 +2,34 @@
 
 import Link from 'next/link';
 import type { Topic } from '@/lib/types';
+import { SegmentedBar } from '@/components/ui/SegmentedBar';
 
 interface TopicCardProps {
   topic: Topic;
   passed: number;
   learning: number;
+  struggling: number;
   total: number;
   percentage: number;
   learningPct: number;
+  strugglingPct: number;
   isPassed: boolean;
   exam: 'binnen' | 'see';
 }
 
-export function TopicCard({ topic, passed, learning, total, percentage, learningPct, isPassed, exam }: TopicCardProps): React.ReactElement {
-  const seen = passed + learning;
+export function TopicCard({
+  topic,
+  passed,
+  learning,
+  struggling,
+  total,
+  percentage,
+  learningPct,
+  strugglingPct,
+  isPassed,
+  exam,
+}: TopicCardProps): React.ReactElement {
+  const seen = passed + learning + struggling;
   return (
     <Link
       href={`/ueben/${exam}/${topic.id}`}
@@ -47,49 +61,31 @@ export function TopicCard({ topic, passed, learning, total, percentage, learning
         )}
       </div>
 
-      {/* Segmented progress bar: green = gelernt, gold/seafoam = lernend */}
-      <div
-        className="h-1.5 rounded-full overflow-hidden mb-2"
-        style={{ background: 'rgba(255,255,255,0.07)' }}
-      >
-        <div className="h-full flex">
-          {percentage > 0 && (
-            <div
-              className="h-full transition-all duration-500"
-              style={{ width: `${percentage}%`, background: 'var(--green-signal)' }}
-            />
-          )}
-          {learningPct > 0 && (
-            <div
-              className="h-full transition-all duration-500"
-              style={{
-                width: `${learningPct}%`,
-                background: exam === 'see' ? 'var(--seafoam)' : 'var(--gold)',
-                opacity: 0.7,
-              }}
-            />
-          )}
-        </div>
-      </div>
+      {/* Multi-colour bar: dunkelgrün = gelernt, hellgrün = lernend, rot = schwierig, Rest = neu */}
+      <SegmentedBar
+        className="mb-2"
+        segments={[
+          { pct: percentage, color: 'var(--green-deep)' },
+          { pct: learningPct, color: 'var(--green-light)' },
+          { pct: strugglingPct, color: 'var(--red-signal)' },
+        ]}
+      />
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs" style={{ color: 'var(--muted)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs tabular-nums" style={{ color: 'var(--muted)' }}>
           {seen > 0 ? (
             <>
-              <span style={{ color: 'var(--green-signal)' }}>{passed}</span>
-              {learning > 0 && (
-                <span style={{ color: exam === 'see' ? 'var(--seafoam)' : 'var(--gold)' }}>
-                  {' '}+{learning}
-                </span>
-              )}
-              <span> / {total}</span>
+              <span style={{ color: 'var(--green-deep)' }}>{passed}</span>
+              {learning > 0 && <span style={{ color: 'var(--green-light)' }}> · {learning}</span>}
+              {struggling > 0 && <span style={{ color: 'var(--red-signal)' }}> · {struggling}</span>}
+              <span style={{ color: 'var(--muted)' }}> / {total}</span>
             </>
           ) : (
             `0 / ${total} Fragen`
           )}
         </span>
         <span
-          className="text-xs font-medium tabular-nums"
+          className="text-xs font-medium tabular-nums shrink-0"
           style={{ color: isPassed ? 'var(--green-signal)' : 'var(--muted)' }}
         >
           {percentage}%

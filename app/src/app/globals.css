@@ -21,6 +21,8 @@
   /* Semantic */
   --red-signal:   #E84444;
   --green-signal: #12B870;
+  --green-deep:   #0A7D4A; /* gelernt — fully mastered (dark green) */
+  --green-light:  #4ADE9B; /* lernend — in progress (light green) */
 
   /* Text */
   --white: #E8EEF6;

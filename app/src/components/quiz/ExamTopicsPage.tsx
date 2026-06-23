@@ -244,7 +244,7 @@ export function ExamTopicsPage({
           </div>
         </Link>
 
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
             Themengebiete
           </h2>
@@ -255,6 +255,14 @@ export function ExamTopicsPage({
           >
             Alle Fragen ansehen →
           </Link>
+        </div>
+
+        {/* Colour legend for the topic progress bars */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-5 text-xs" style={{ color: 'var(--muted)' }}>
+          <LegendDot color="var(--green-deep)" label="gelernt" />
+          <LegendDot color="var(--green-light)" label="im Lernen" />
+          <LegendDot color="var(--red-signal)" label="schwierig" />
+          <LegendDot color="rgba(255,255,255,0.12)" label="neu" />
         </div>
 
         {hardCount > 0 && (
@@ -328,16 +336,18 @@ export function ExamTopicsPage({
           {effectiveTopics
             .filter((t) => (progressData[t.id]?.total ?? 0) > 0)
             .map((topic) => {
-              const pd = progressData[topic.id] ?? { passed: 0, learning: 0, total: 0, percentage: 0, learningPct: 0, isPassed: false };
+              const pd = progressData[topic.id] ?? { passed: 0, learning: 0, struggling: 0, total: 0, percentage: 0, learningPct: 0, strugglingPct: 0, isPassed: false };
               return (
                 <TopicCard
                   key={topic.id}
                   topic={topic}
                   passed={pd.passed}
                   learning={pd.learning}
+                  struggling={pd.struggling}
                   total={pd.total}
                   percentage={pd.percentage}
                   learningPct={pd.learningPct}
+                  strugglingPct={pd.strugglingPct}
                   isPassed={pd.isPassed}
                   exam={exam}
                 />
@@ -358,5 +368,19 @@ export function ExamTopicsPage({
         </div>
       </div>
     </div>
+  );
+}
+
+interface LegendDotProps {
+  color: string;
+  label: string;
+}
+
+function LegendDot({ color, label }: LegendDotProps): React.ReactElement {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
+      {label}
+    </span>
   );
 }
