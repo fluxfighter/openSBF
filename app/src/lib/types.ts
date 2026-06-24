@@ -59,6 +59,8 @@ export interface TopicProgress {
 export interface DailySession {
   date: string;       // YYYY-MM-DD — sessions from previous days are ignored
   queueIds: number[]; // ordered question IDs for the day's learning queue
+  correct?: number;   // running ✓ tally for the day, so it survives re-entering
+  wrong?: number;     // running ✗ tally for the day
 }
 
 export interface UserProgress {

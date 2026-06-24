@@ -327,13 +327,15 @@ export function mergeProgress(current: UserProgress, imported: UserProgress): Us
   }
 
   // Daily sessions: per exam, keep whichever side is further along today
-  // (fewer IDs remaining = more answered). Stale sessions (yesterday) are dropped.
+  // (higher ✓+✗ tally = more answered). Stale sessions (yesterday) are dropped.
   const today = new Date().toISOString().slice(0, 10);
+  const sessionTotal = (s: { correct?: number; wrong?: number }): number =>
+    (s.correct ?? 0) + (s.wrong ?? 0);
   const mergedSessions: NonNullable<UserProgress['dailySessions']> = { ...(current.dailySessions ?? {}) };
   for (const [exam, importedSession] of Object.entries(imported.dailySessions ?? {})) {
     if (importedSession.date !== today) continue;
     const existing = mergedSessions[exam];
-    if (!existing || existing.date !== today || importedSession.queueIds.length < existing.queueIds.length) {
+    if (!existing || existing.date !== today || sessionTotal(importedSession) > sessionTotal(existing)) {
       mergedSessions[exam] = importedSession;
     }
   }

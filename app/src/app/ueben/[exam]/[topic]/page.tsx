@@ -70,9 +70,39 @@ function withSessionQueue(progress: UserProgress, exam: ExamType, questions: Que
     ...progress,
     dailySessions: {
       ...(progress.dailySessions ?? {}),
-      [exam]: { date: todayStr(), queueIds: questions.map((q) => q.id) },
+      [exam]: { date: todayStr(), queueIds: questions.map((q) => q.id), correct: 0, wrong: 0 },
     },
   };
+}
+
+// Pure: bump today's running ✓/✗ tally so it survives leaving and re-entering.
+// No-op for non-daily modes (no session for this exam today).
+function withSessionAnswer(progress: UserProgress, exam: ExamType, isCorrect: boolean): UserProgress {
+  const session = progress.dailySessions?.[exam];
+  if (!session || session.date !== todayStr()) return progress;
+  return {
+    ...progress,
+    dailySessions: {
+      ...progress.dailySessions,
+      [exam]: {
+        ...session,
+        correct: (session.correct ?? 0) + (isCorrect ? 1 : 0),
+        wrong: (session.wrong ?? 0) + (isCorrect ? 0 : 1),
+      },
+    },
+  };
+}
+
+// Restore today's saved ✓/✗ tally for the daily queue (zero otherwise).
+function initialSessionStats(topicId: string, exam: ExamType): SessionStats {
+  if (typeof window === 'undefined' || topicId !== DAILY_QUEUE_TOPIC_ID) {
+    return { correct: 0, wrong: 0, total: 0 };
+  }
+  const session = loadProgress().dailySessions?.[exam];
+  if (!session || session.date !== todayStr()) return { correct: 0, wrong: 0, total: 0 };
+  const correct = session.correct ?? 0;
+  const wrong = session.wrong ?? 0;
+  return { correct, wrong, total: correct + wrong };
 }
 
 // Pure: returns new progress with today's session for this exam removed.
@@ -231,7 +261,7 @@ export default function QuizPage(): React.ReactElement {
   );
   const { options: shuffledOptions, selectedAnswer, isRevealed } = view;
 
-  const [sessionStats, setSessionStats] = useState<SessionStats>({ correct: 0, wrong: 0, total: 0 });
+  const [sessionStats, setSessionStats] = useState<SessionStats>(() => initialSessionStats(topicId, exam));
   const [isComplete, setIsComplete] = useState(false);
   // Set when a correct answer should auto-advance after a short delay.
   const [pendingAdvance, setPendingAdvance] = useState(false);
@@ -264,7 +294,11 @@ export default function QuizPage(): React.ReactElement {
 
       const currentQuestion = questions[currentIdx];
       const isCorrect = key === currentQuestion.correctAnswer;
-      const updatedProgress = recordAnswer(progress, currentQuestion.id, exam, isCorrect);
+      const updatedProgress = withSessionAnswer(
+        recordAnswer(progress, currentQuestion.id, exam, isCorrect),
+        exam,
+        isCorrect,
+      );
       saveProgress(updatedProgress);
 
       // Decide whether to re-insert this card for relearning, and after how many
