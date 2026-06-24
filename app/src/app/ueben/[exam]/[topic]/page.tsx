@@ -45,6 +45,18 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function answeredOn(iso: string | undefined, day: string): boolean {
+  return typeof iso === 'string' && iso.slice(0, 10) === day;
+}
+
+// How many of today's queue have already been attempted today (cleared or not).
+// Derived from per-question lastAnswered, which persists and syncs — so the
+// daily progress bar survives leaving and re-entering the session.
+function dailyAnsweredCount(progress: UserProgress, exam: ExamType, queueIds: number[]): number {
+  const today = todayStr();
+  return queueIds.filter((id) => answeredOn(progress.questions[`${exam}_${id}`]?.lastAnswered, today)).length;
+}
+
 // Today's saved queue order for this exam, or null if none / from a past day.
 function getSessionQueueIds(progress: UserProgress, exam: ExamType): number[] | null {
   const session = progress.dailySessions?.[exam];
@@ -150,14 +162,22 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
       ? (() => {
           const idToQ = new Map(allQuestions.map((q) => [q.id, q]));
           const now = Date.now();
-          return savedIds
-            .map((id) => idToQ.get(id))
-            .filter((q): q is Question => {
-              if (!q) return false;
-              const p = progress.questions[`${exam}_${q.id}`];
-              if (!p || !p.due) return true; // unseen → keep
-              return new Date(p.due).getTime() <= now; // due → keep, future → answered, drop
-            });
+          const today = todayStr();
+          // Keep only cards not yet cleared (a correct answer pushes `due` into
+          // the future). Then put cards already attempted today (e.g. answered
+          // wrong) at the END, so resuming continues with fresh cards instead of
+          // re-showing the one you just got wrong.
+          const fresh: Question[] = [];
+          const retry: Question[] = [];
+          for (const id of savedIds) {
+            const q = idToQ.get(id);
+            if (!q) continue;
+            const p = progress.questions[`${exam}_${id}`];
+            if (p?.due && new Date(p.due).getTime() > now) continue; // cleared today → drop
+            if (answeredOn(p?.lastAnswered, today)) retry.push(q);
+            else fresh.push(q);
+          }
+          return [...fresh, ...retry];
         })()
       : [];
 
@@ -467,8 +487,14 @@ export default function QuizPage(): React.ReactElement {
   const bookmarked = isBookmarked(progress, currentQuestion.id, exam);
   const isAnswerCorrect = isRevealed && selectedAnswer === currentQuestion.correctAnswer;
   const tutorialId = tutorialForTopic(currentQuestion.topic, exam);
-  // Session progress through the deck — fills as you answer (Duolingo-style).
-  const sessionPct = Math.round(((currentIdx + (isRevealed ? 1 : 0)) / questions.length) * 100);
+  // Session progress. For the daily queue it reflects how many of today's cards
+  // have been attempted (derived from persisted lastAnswered), so it survives
+  // leaving and re-entering. For other modes it tracks position in the deck.
+  const dailySession = topicId === DAILY_QUEUE_TOPIC_ID ? progress.dailySessions?.[exam] : undefined;
+  const sessionPct =
+    dailySession && dailySession.date === todayStr() && dailySession.queueIds.length > 0
+      ? Math.round((dailyAnsweredCount(progress, exam, dailySession.queueIds) / dailySession.queueIds.length) * 100)
+      : Math.round(((currentIdx + (isRevealed ? 1 : 0)) / questions.length) * 100);
   const barColor = exam === 'binnen' ? 'var(--gold)' : 'var(--seafoam)';
 
   return (
