@@ -300,24 +300,23 @@ export default function QuizPage(): React.ReactElement {
       );
       saveProgress(updatedProgress);
 
-      // In-session relearning (re-show a missed card a few cards later) only
-      // applies to the daily queue — it's the spaced-repetition engine. Topic /
-      // hard / bookmarked modes are a single pass, so they never re-insert.
+      // In-session relearning (every mode): re-show a missed card a few cards
+      // later at growing gaps until it's answered right again. Wrong → restart
+      // the step ladder; correct while relearning → advance to the next, larger
+      // gap until it graduates. Bounded, so the session still reaches an end.
       const qid = currentQuestion.id;
       const stepsLeft = relearnRef.current.get(qid) ?? 0;
       let reinsertGap: number | null = null;
-      if (topicId === DAILY_QUEUE_TOPIC_ID) {
-        if (!isCorrect) {
-          relearnRef.current.set(qid, RELEARN_STEPS.length);
-          reinsertGap = RELEARN_STEPS[0];
-        } else if (stepsLeft > 0) {
-          const remaining = stepsLeft - 1;
-          if (remaining > 0) {
-            relearnRef.current.set(qid, remaining);
-            reinsertGap = RELEARN_STEPS[RELEARN_STEPS.length - remaining];
-          } else {
-            relearnRef.current.delete(qid); // graduated for this session
-          }
+      if (!isCorrect) {
+        relearnRef.current.set(qid, RELEARN_STEPS.length);
+        reinsertGap = RELEARN_STEPS[0];
+      } else if (stepsLeft > 0) {
+        const remaining = stepsLeft - 1;
+        if (remaining > 0) {
+          relearnRef.current.set(qid, remaining);
+          reinsertGap = RELEARN_STEPS[RELEARN_STEPS.length - remaining];
+        } else {
+          relearnRef.current.delete(qid); // graduated for this session
         }
       }
 
@@ -352,7 +351,7 @@ export default function QuizPage(): React.ReactElement {
         setPendingAdvance(true);
       }
     },
-    [isRevealed, questions, currentIdx, progress, exam, topicId],
+    [isRevealed, questions, currentIdx, progress, exam],
   );
 
   const handleNext = useCallback((): void => {
@@ -513,10 +512,19 @@ export default function QuizPage(): React.ReactElement {
   // have been attempted (derived from persisted lastAnswered), so it survives
   // leaving and re-entering. For other modes it tracks position in the deck.
   const dailySession = topicId === DAILY_QUEUE_TOPIC_ID ? progress.dailySessions?.[exam] : undefined;
-  const sessionPct =
-    dailySession && dailySession.date === todayStr() && dailySession.queueIds.length > 0
-      ? Math.round((dailyAnsweredCount(progress, exam, dailySession.queueIds) / dailySession.queueIds.length) * 100)
-      : Math.round(((currentIdx + (isRevealed ? 1 : 0)) / questions.length) * 100);
+  // Progress counts DISTINCT questions, not deck position — so relearning
+  // re-inserts (the same question shown again later) never inflate the bar.
+  // 100% = every unique question in this session answered at least once.
+  const sessionPct = (() => {
+    if (dailySession && dailySession.date === todayStr() && dailySession.queueIds.length > 0) {
+      return Math.round((dailyAnsweredCount(progress, exam, dailySession.queueIds) / dailySession.queueIds.length) * 100);
+    }
+    const totalUnique = new Set(questions.map((q) => q.id)).size;
+    const answeredUnique = new Set(
+      questions.slice(0, currentIdx + (isRevealed ? 1 : 0)).map((q) => q.id),
+    ).size;
+    return totalUnique > 0 ? Math.round((answeredUnique / totalUnique) * 100) : 0;
+  })();
   const barColor = exam === 'binnen' ? 'var(--gold)' : 'var(--seafoam)';
 
   return (
