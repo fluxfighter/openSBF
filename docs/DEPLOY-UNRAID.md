@@ -29,6 +29,11 @@ Am einfachsten für einen Heim-Single-User: Repo auf Unraid holen und mit
 ```bash
 # 1) Zielordner (überlebt Reboots, da auf dem Array)
 mkdir -p /mnt/user/appdata/opensbf
+# WICHTIG: Der Container läuft als non-root user (uid 1001). Das Daten-
+# verzeichnis muss diesem gehören, sonst kann der Server progress.json
+# NICHT schreiben → der Lernstand wird nie geteilt (jedes Gerät bleibt
+# auf seinem lokalen localStorage-Cache). Einmalig setzen:
+chown -R 1001:1001 /mnt/user/appdata/opensbf
 cd /mnt/user/appdata
 
 # 2) Repo holen (main enthält den aktuellen Stand)
@@ -128,7 +133,8 @@ Wenn du den Container lieber im Web-UI siehst, gibt es zwei Wege:
 | `docker compose: command not found` | Compose Manager (CA) installieren oder v2-Binary einrichten |
 | Build bricht ab | Logs lesen: `docker compose logs`. Genug RAM/Speicher frei? |
 | Seite lädt, Fortschritt weg nach Rebuild | Volume-Mapping prüfen: `/mnt/user/appdata/opensbf:/data` muss gesetzt sein |
-| Sync zwischen Geräten klappt nicht | Beide Geräte müssen dieselbe IP/denselben Port nutzen; Container-Logs auf `PUT /api/state` checken |
+| Sync zwischen Geräten klappt nicht | **Häufigste Ursache: Schreibrechte.** Der Container läuft als uid 1001; das Daten-Verzeichnis muss ihm gehören: `chown -R 1001:1001 /mnt/user/appdata/opensbf`. Test: `docker exec opensbf sh -c 'echo x > /data/_t && echo OK && rm /data/_t'`. Sonst: beide Geräte dieselbe IP/Port; Container-Logs auf `PUT /api/state` checken |
+| `progress.json` wird nicht angelegt | Schreibrecht fehlt → siehe Zeile oben (`chown 1001:1001`). Unraids „Docker Safe New Permissions" setzt appdata ggf. auf `99:100` zurück — dann erneut chownen |
 | Container „unhealthy" | `docker compose logs opensbf` — meist Startfehler; Healthcheck pingt `/api/state` |
 
 ---
