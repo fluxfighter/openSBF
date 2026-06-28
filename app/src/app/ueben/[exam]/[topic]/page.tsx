@@ -14,7 +14,6 @@ import {
   loadProgress,
   saveProgress,
   recordAnswer,
-  isQuestionPassed,
   getQuestionStreak,
   getQuestionBestStreak,
   getQuestionWrongCount,
@@ -22,7 +21,6 @@ import {
   getBookmarkedQuestions,
   isBookmarked,
   toggleBookmark,
-  isTopicPassed,
 } from '@/lib/progress';
 import { buildDailyQueue } from '@/lib/srs';
 import { playCorrect, playFinish, isSoundEnabled, setSoundEnabled } from '@/lib/sound';
@@ -226,9 +224,10 @@ function initQuizState(topicId: string, exam: ExamType, initialQ: number, zusatz
   } else if (topicId === BOOKMARKED_TOPIC_ID) {
     questions = shuffleArray(getBookmarkedQuestions(progress, exam, allQuestions));
   } else {
-    const topicQuestions = getTopicQuestions(topicId, exam, zusatz);
-    const unpassed = topicQuestions.filter((q) => !isQuestionPassed(progress, q.id, exam));
-    questions = shuffleArray(unpassed.length > 0 ? unpassed : topicQuestions);
+    // Topic mode is a single pass through ALL of the topic's questions — a
+    // "Fragebogen" review. 100% = once through everything. Spaced repetition of
+    // what you got wrong happens via the daily queue, not by looping here.
+    questions = shuffleArray(getTopicQuestions(topicId, exam, zusatz));
   }
 
   const currentIdx = initialQ > 0 && initialQ < questions.length ? initialQ : 0;
@@ -301,22 +300,24 @@ export default function QuizPage(): React.ReactElement {
       );
       saveProgress(updatedProgress);
 
-      // Decide whether to re-insert this card for relearning, and after how many
-      // cards. Wrong → restart the step ladder (first gap). Correct while still
-      // relearning → advance to the next, larger gap until the ladder is done.
+      // In-session relearning (re-show a missed card a few cards later) only
+      // applies to the daily queue — it's the spaced-repetition engine. Topic /
+      // hard / bookmarked modes are a single pass, so they never re-insert.
       const qid = currentQuestion.id;
       const stepsLeft = relearnRef.current.get(qid) ?? 0;
       let reinsertGap: number | null = null;
-      if (!isCorrect) {
-        relearnRef.current.set(qid, RELEARN_STEPS.length);
-        reinsertGap = RELEARN_STEPS[0];
-      } else if (stepsLeft > 0) {
-        const remaining = stepsLeft - 1;
-        if (remaining > 0) {
-          relearnRef.current.set(qid, remaining);
-          reinsertGap = RELEARN_STEPS[RELEARN_STEPS.length - remaining];
-        } else {
-          relearnRef.current.delete(qid); // graduated for this session
+      if (topicId === DAILY_QUEUE_TOPIC_ID) {
+        if (!isCorrect) {
+          relearnRef.current.set(qid, RELEARN_STEPS.length);
+          reinsertGap = RELEARN_STEPS[0];
+        } else if (stepsLeft > 0) {
+          const remaining = stepsLeft - 1;
+          if (remaining > 0) {
+            relearnRef.current.set(qid, remaining);
+            reinsertGap = RELEARN_STEPS[RELEARN_STEPS.length - remaining];
+          } else {
+            relearnRef.current.delete(qid); // graduated for this session
+          }
         }
       }
 
@@ -351,7 +352,7 @@ export default function QuizPage(): React.ReactElement {
         setPendingAdvance(true);
       }
     },
-    [isRevealed, questions, currentIdx, progress, exam],
+    [isRevealed, questions, currentIdx, progress, exam, topicId],
   );
 
   const handleNext = useCallback((): void => {
@@ -369,22 +370,9 @@ export default function QuizPage(): React.ReactElement {
         setQuiz((prev) => ({ ...prev, questions: stillDue, currentIdx: 0, view: makeView(stillDue[0]), answered: {} }));
         return;
       }
-      if (topicId === HARD_QUESTIONS_TOPIC_ID || topicId === BOOKMARKED_TOPIC_ID) {
-        setIsComplete(true);
-        return;
-      }
-      const topicQuestions = getTopicQuestions(topicId, exam, binnenZusatz);
-      if (isTopicPassed(progress, topicQuestions.map((q) => q.id), exam)) {
-        setIsComplete(true);
-        return;
-      }
-      const unpassed = topicQuestions.filter((q) => !isQuestionPassed(progress, q.id, exam));
-      if (unpassed.length === 0) {
-        setIsComplete(true);
-        return;
-      }
-      const newQuestions = shuffleArray(unpassed);
-      setQuiz((prev) => ({ ...prev, questions: newQuestions, currentIdx: 0, view: makeView(newQuestions[0]), answered: {} }));
+      // Every other mode (topic / hard / bookmarked) is a single pass — once you
+      // reach the end you're done. Show the completion screen instead of looping.
+      setIsComplete(true);
       return;
     }
     setQuiz((prev) => ({
@@ -392,7 +380,7 @@ export default function QuizPage(): React.ReactElement {
       currentIdx: prev.currentIdx + 1,
       view: viewForIndex(prev, prev.currentIdx + 1),
     }));
-  }, [currentIdx, questions, topicId, exam, progress, allQuestions, binnenZusatz]);
+  }, [currentIdx, questions, topicId, exam, progress, allQuestions]);
 
   const handleBack = useCallback((): void => {
     setPendingAdvance(false);
@@ -793,14 +781,23 @@ function CompletionScreen({
 }: CompletionScreenProps): React.ReactElement {
   const topicName = getTopicName(topicId, exam);
   const isDaily = topicId === DAILY_QUEUE_TOPIC_ID;
+  const isBookmarkMode = topicId === BOOKMARKED_TOPIC_ID;
   const accuracy = sessionStats.total > 0 ? Math.round((sessionStats.correct / sessionStats.total) * 100) : 0;
 
-  const title = isDaily ? 'Tagesziel erreicht' : isHardMode ? 'Gut gemacht!' : 'Thema bestanden';
+  const title = isDaily
+    ? 'Tagesziel erreicht'
+    : isHardMode
+      ? 'Gut gemacht!'
+      : isBookmarkMode
+        ? 'Gemerkte Fragen durch'
+        : 'Thema geschafft';
   const subtitle = isDaily
     ? 'Alle fälligen Karten für heute gelernt 🎉'
     : isHardMode
       ? 'Du hast alle Problemfragen geübt'
-      : topicName;
+      : isBookmarkMode
+        ? 'Alle gemerkten Fragen einmal durchgegangen'
+        : `${topicName} — einmal komplett durch. Wiederholungen kommen über „Heute lernen".`;
 
   // Reward scaled by accuracy: 0–3 stars + a fanfare on arrival.
   const stars = accuracy >= 90 ? 3 : accuracy >= 70 ? 2 : accuracy >= 50 ? 1 : 0;
